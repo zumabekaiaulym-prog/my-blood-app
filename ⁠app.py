@@ -3,8 +3,6 @@ from PIL import Image
 import pandas as pd
 import requests
 import io
-import numpy as np
-import cv2
 
 st.set_page_config(page_title="BloodScan AI", layout="wide")
 st.title("BloodScan AI — Анализ снимка крови")
@@ -38,63 +36,37 @@ if uploaded_file is not None:
         if st.button("🔬 Проанализировать через ИИ", use_container_width=True):
             with st.spinner("ИИ считает клетки крови..."):
                 try:
-                    # Преобразуем фото в байты
+                    # Приводим изображение к стандартному размеру для стабильного распознавания
+                    img_resized = image.convert("RGB").resize((640, 640))
                     img_byte_arr = io.BytesIO()
-                    image.convert("RGB").save(img_byte_arr, format='JPEG')
+                    img_resized.save(img_byte_arr, format='JPEG', quality=95)
                     img_bytes = img_byte_arr.getvalue()
                     
-                    # Передаем низкий порог (confidence=1) и запрашиваем маски
-                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=1&format=json"
-                    response = requests.post(
-                        url,
-                        files={"file": ("image.jpg", img_bytes, "image/jpeg")}
-                    )
+                    # 1. Запрос на получение размеченной картинки
+                    img_url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=1&overlap=30&labels=on&format=image"
+                    img_res = requests.post(img_url, files={"file": ("image.jpg", img_bytes, "image/jpeg")})
                     
-                    res_json = response.json()
+                    # 2. Запрос на получение JSON с данными
+                    json_url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=1&overlap=30"
+                    json_res = requests.post(json_url, files={"file": ("image.jpg", img_bytes, "image/jpeg")})
+                    res_json = json_res.json()
                     
-                    if "error" in res_json:
-                        st.error(f"Ошибка Roboflow: {res_json['error']}")
+                    if img_res.status_code == 200:
+                        st.image(img_res.content, caption="Размеченный ИИ снимок", use_container_width=True)
+                    
+                    predictions = res_json.get("predictions", [])
+                    st.success(f"Найдено всего объектов: {len(predictions)}")
+                    
+                    counts = {}
+                    for p in predictions:
+                        cell_class = p.get("class", "Объект")
+                        counts[cell_class] = counts.get(cell_class, 0) + 1
+                        
+                    if counts:
+                        df_result = pd.DataFrame(list(counts.items()), columns=["Тип клетки / объекта", "Количество"])
+                        st.dataframe(df_result, use_container_width=True)
                     else:
-                        predictions = res_json.get("predictions", [])
+                        st.warning("Клетки не обнаружены. Попробуйте обрезать или приблизить снимок.")
                         
-                        # Подготовка к рисованию рамок через OpenCV
-                        cv_img = np.array(image.convert("RGB"))
-                        cv_img = cv2.cvtColor(cv_img, cv2.COLOR_RGB2BGR)
-                        
-                        counts = {}
-                        for p in predictions:
-                            cell_class = p.get("class", "Клетка")
-                            confidence = p.get("confidence", 0)
-                            counts[cell_class] = counts.get(cell_class, 0) + 1
-                            
-                            # Рисуем полигон, если он есть, иначе рамку
-                            if "points" in p and len(p["points"]) > 0:
-                                pts = np.array([[int(pt["x"]), int(pt["y"])] for pt in p["points"]], np.int32)
-                                pts = pts.reshape((-1, 1, 2))
-                                color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
-                                cv2.polylines(cv_img, [pts], True, color, 2)
-                            else:
-                                x, y, w, h = int(p["x"]), int(p["y"]), int(p["width"]), int(p["height"])
-                                x1, y1 = int(x - w / 2), int(y - h / 2)
-                                x2, y2 = int(x + w / 2), int(y + h / 2)
-                                color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
-                                cv2.rectangle(cv_img, (x1, y1), (x2, y2), color, 2)
-                            
-                            x_text = int(p.get("x", 20))
-                            y_text = int(p.get("y", 20))
-                            cv2.putText(cv_img, f"{cell_class} {int(confidence * 100)}%", 
-                                        (x_text, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
-                        
-                        result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-                        st.image(result_img, caption="Размеченный ИИ снимок", use_container_width=True)
-                        
-                        st.success(f"Найдено всего объектов: {len(predictions)}")
-                        
-                        if counts:
-                            df_result = pd.DataFrame(list(counts.items()), columns=["Тип клетки / объекта", "Количество"])
-                            st.dataframe(df_result, use_container_width=True)
-                        else:
-                            st.warning("Клетки не обнаружены.")
-                            
                 except Exception as e:
                     st.error(f"Ошибка анализа: {e}")
