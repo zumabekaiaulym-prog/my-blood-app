@@ -7,16 +7,18 @@ st.set_page_config(page_title="BloodScan AI", layout="wide")
 st.title("BloodScan AI — Анализ снимка крови")
 
 # ==========================================
-# ОБНОВЛЕННЫЙ API КЛЮЧ
+# ДАННЫЕ ROBOFLOW (С УКАЗАНИЕМ WORKSPACE)
 # ==========================================
 ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
+WORKSPACE_ID = "aia-zum"
 PROJECT_ID = "complete-blood-cell-analysis-1-yolo26n-seg-t1"
 VERSION_NUM = 1
 
 @st.cache_resource
 def get_model():
     rf = Roboflow(api_key=ROBOFLOW_API_KEY)
-    project = rf.workspace().project(PROJECT_ID)
+    # Явно указываем область aia-zum и проект
+    project = rf.workspace(WORKSPACE_ID).project(PROJECT_ID)
     return project.version(VERSION_NUM).model
 
 # ==========================================
@@ -24,7 +26,6 @@ def get_model():
 # ==========================================
 st.subheader("1. Источник снимка с микроскопа")
 
-# Выбор источника: файл или прямая камера/USB-микроскоп
 source_mode = st.radio("Выберите способ получения снимка:", ["Загрузить файл снимка", "Сделать снимок с камеры / USB-микроскопа"])
 
 uploaded_file = None
