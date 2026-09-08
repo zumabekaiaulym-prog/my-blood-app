@@ -42,18 +42,22 @@ if uploaded_file is not None:
                     img_byte_arr = io.BytesIO()
                     image.convert("RGB").save(img_byte_arr, format='JPEG')
                     img_bytes = img_byte_arr.getvalue()
-                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=20
+                    
+                    # Отправляем запрос в API с порогом 20% для лучшего обнаружения
+                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=20"
                     response = requests.post(
-                    url,
-                    files={"file": ("image.jpg", img_bytes, "image/jpeg")}
+                        url,
+                        files={"file": ("image.jpg", img_bytes, "image/jpeg")}
                     )
+                    
                     res_json = response.json()
+                    
                     if "error" in res_json:
                         st.error(f"Ошибка Roboflow: {res_json['error']}")
                     else:
                         predictions = res_json.get("predictions", [])
                         
-                        # Переводим изображение в формат OpenCV для отрисовки рамок
+                        # Рисуем рамки с помощью OpenCV
                         cv_img = np.array(image.convert("RGB"))
                         cv_img = cv2.cvtColor(cv_img, cv2.COLOR_RGB2BGR)
                         
@@ -63,7 +67,6 @@ if uploaded_file is not None:
                             confidence = p.get("confidence", 0)
                             counts[cell_class] = counts.get(cell_class, 0) + 1
                             
-                            # Координаты рамки
                             x = int(p["x"])
                             y = int(p["y"])
                             w = int(p["width"])
@@ -74,13 +77,11 @@ if uploaded_file is not None:
                             x2 = int(x + w / 2)
                             y2 = int(y + h / 2)
                             
-                            # Рисуем рамку и подпись
                             color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
                             cv2.rectangle(cv_img, (x1, y1), (x2, y2), color, 2)
                             label = f"{cell_class} {int(confidence * 100)}%"
                             cv2.putText(cv_img, label, (x1, max(y1 - 10, 15)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                         
-                        # Конвертируем обратно для отображения в Streamlit
                         result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
                         st.image(result_img, caption="Размеченный ИИ снимок", use_container_width=True)
                         
@@ -90,8 +91,7 @@ if uploaded_file is not None:
                             df_result = pd.DataFrame(list(counts.items()), columns=["Тип клетки / объекта", "Количество"])
                             st.dataframe(df_result, use_container_width=True)
                         else:
-                            st.warning("Клетки не обнаружены.")
+                            st.warning("Клетки не обнаружены. Попробуйте другой снимок.")
                             
                 except Exception as e:
                     st.error(f"Ошибка анализа: {e}")
-
