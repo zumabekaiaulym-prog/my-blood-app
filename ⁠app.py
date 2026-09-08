@@ -7,7 +7,7 @@ st.set_page_config(page_title="BloodScan AI", layout="wide")
 st.title("BloodScan AI — Анализ снимка крови")
 
 # ==========================================
-# ДАННЫЕ ROBOFLOW (С УКАЗАНИЕМ WORKSPACE)
+# ТОЧНЫЕ ДАННЫЕ С ТВОЕГО СКРИНШОТА
 # ==========================================
 ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
 WORKSPACE_ID = "aia-zum"
@@ -17,12 +17,12 @@ VERSION_NUM = 1
 @st.cache_resource
 def get_model():
     rf = Roboflow(api_key=ROBOFLOW_API_KEY)
-    # Явно указываем область aia-zum и проект
+    # Подключаем проект через рабочую область aia-zum
     project = rf.workspace(WORKSPACE_ID).project(PROJECT_ID)
     return project.version(VERSION_NUM).model
 
 # ==========================================
-# ИНТЕРФЕЙС И РАБОТА ИИ
+# ИНТЕРФЕЙС И ОПИСАНИЕ
 # ==========================================
 st.subheader("1. Источник снимка с микроскопа")
 
@@ -47,22 +47,21 @@ if uploaded_file is not None:
         if st.button("🔬 Проанализировать через ИИ", use_container_width=True):
             with st.spinner("ИИ считает клетки крови..."):
                 try:
-                    # Сохраняем временный файл
+                    # Сохраняем во временный файл
                     image.save("temp_blood.jpg")
                     
-                    # Подключаемся к вашей модели
+                    # Загружаем модель
                     model = get_model()
                     prediction = model.predict("temp_blood.jpg", confidence=40, overlap=30)
                     
-                    # Сохраняем изображение с нарисованной сегментацией
+                    # Сохраняем разметку
                     prediction.save("result_blood.jpg")
                     st.image("result_blood.jpg", caption="Размеченный ИИ снимок", use_container_width=True)
                     
-                    # Получаем данные о найденных объектах
+                    # Обрабатываем JSON с ответом
                     json_data = prediction.json()
                     predictions_list = json_data.get("predictions", [])
                     
-                    # Считаем количество для каждого типа клеток
                     counts = {}
                     for item in predictions_list:
                         cell_type = item["class"]
@@ -74,7 +73,7 @@ if uploaded_file is not None:
                         df_result = pd.DataFrame(list(counts.items()), columns=["Тип клетки / объекта", "Количество"])
                         st.dataframe(df_result, use_container_width=True)
                     else:
-                        st.warning("ИИ не обнаружил знакомых объектов на снимке.")
+                        st.warning("Клетки не обнаружены.")
                         
                 except Exception as e:
                     st.error(f"Ошибка при обработке моделью Roboflow: {e}")
