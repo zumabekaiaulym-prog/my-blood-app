@@ -42,16 +42,12 @@ if uploaded_file is not None:
                     img_byte_arr = io.BytesIO()
                     image.convert("RGB").save(img_byte_arr, format='JPEG')
                     img_bytes = img_byte_arr.getvalue()
-                    
-                    # Отправляем запрос в Inference API Roboflow
-                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}"
+                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=20
                     response = requests.post(
-                        url,
-                        files={"file": ("image.jpg", img_bytes, "image/jpeg")}
+                    url,
+                    files={"file": ("image.jpg", img_bytes, "image/jpeg")}
                     )
-                    
                     res_json = response.json()
-                    
                     if "error" in res_json:
                         st.error(f"Ошибка Roboflow: {res_json['error']}")
                     else:
