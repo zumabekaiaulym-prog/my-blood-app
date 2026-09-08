@@ -43,8 +43,8 @@ if uploaded_file is not None:
                     image.convert("RGB").save(img_byte_arr, format='JPEG')
                     img_bytes = img_byte_arr.getvalue()
                     
-                    # Специализированный эндпоинт Roboflow для Instance Segmentation (outline)
-                    url = f"https://outline.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=10"
+                    # Передаем низкий порог (confidence=1) и запрашиваем маски
+                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=1&format=json"
                     response = requests.post(
                         url,
                         files={"file": ("image.jpg", img_bytes, "image/jpeg")}
@@ -67,27 +67,23 @@ if uploaded_file is not None:
                             confidence = p.get("confidence", 0)
                             counts[cell_class] = counts.get(cell_class, 0) + 1
                             
-                            # Отрисовка по точкам или по центру
+                            # Рисуем полигон, если он есть, иначе рамку
                             if "points" in p and len(p["points"]) > 0:
-                                pts = np.array([[pt["x"], pt["y"]] for pt in p["points"]], np.int32)
+                                pts = np.array([[int(pt["x"]), int(pt["y"])] for pt in p["points"]], np.int32)
                                 pts = pts.reshape((-1, 1, 2))
                                 color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
                                 cv2.polylines(cv_img, [pts], True, color, 2)
                             else:
-                                x = int(p["x"])
-                                y = int(p["y"])
-                                w = int(p["width"])
-                                h = int(p["height"])
+                                x, y, w, h = int(p["x"]), int(p["y"]), int(p["width"]), int(p["height"])
                                 x1, y1 = int(x - w / 2), int(y - h / 2)
                                 x2, y2 = int(x + w / 2), int(y + h / 2)
                                 color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
                                 cv2.rectangle(cv_img, (x1, y1), (x2, y2), color, 2)
                             
-                            # Вывод подписи
                             x_text = int(p.get("x", 20))
                             y_text = int(p.get("y", 20))
                             cv2.putText(cv_img, f"{cell_class} {int(confidence * 100)}%", 
-                                        (x_text, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                                        (x_text, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
                         
                         result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
                         st.image(result_img, caption="Размеченный ИИ снимок", use_container_width=True)
