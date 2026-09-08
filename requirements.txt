@@ -1,5 +1,8 @@
 streamlit
-pandas
-roboflow
 pillow
+pandas
+requests
+numpy
 opencv-python-headless
+roboflow
+fpdf
