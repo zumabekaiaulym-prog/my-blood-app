@@ -1,0 +1,5 @@
+streamlit
+pandas
+roboflow
+pillow
+opencv-python-headless
