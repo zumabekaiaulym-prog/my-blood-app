@@ -7,7 +7,7 @@ st.set_page_config(page_title="BloodScan AI", layout="wide")
 st.title("BloodScan AI — Анализ снимка крови")
 
 # ==========================================
-# ВАШИ ДАННЫЕ ROBOFLOW (УЖЕ ВСТАВЛЕНЫ):
+# ДАННЫЕ ROBOFLOW
 # ==========================================
 ROBOFLOW_API_KEY = "rf_pzHlWjxsfSYLletbkunx4p4DRQk1"
 PROJECT_ID = "complete-blood-cell-analysis-1-yolo26n-seg-t1"
@@ -22,15 +22,24 @@ def get_model():
 # ==========================================
 # ИНТЕРФЕЙС И РАБОТА ИИ
 # ==========================================
-st.subheader("1. Загрузите снимок с микроскопа")
-uploaded_file = st.file_uploader("Выберите фото крови (JPG/PNG)", type=["jpg", "jpeg", "png"])
+st.subheader("1. Источник снимка с микроскопа")
+
+# Выбор источника: файл или прямая камера/USB-микроскоп
+source_mode = st.radio("Выберите способ получения снимка:", ["Загрузить файл снимка", "Сделать снимок с камеры / USB-микроскопа"])
+
+uploaded_file = None
+
+if source_mode == "Загрузить файл снимка":
+    uploaded_file = st.file_uploader("Выберите фото крови (JPG/PNG)", type=["jpg", "jpeg", "png"])
+else:
+    uploaded_file = st.camera_input("Снимок с камеры / USB-микроскопа")
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     col1, col2 = st.columns(2)
     
     with col1:
-        st.image(image, caption="Исходный снимок", use_column_width=True)
+        st.image(image, caption="Исходный снимок", use_container_width=True)
     
     with col2:
         st.subheader("2. Результат работы ИИ")
@@ -46,7 +55,7 @@ if uploaded_file is not None:
                     
                     # Сохраняем изображение с нарисованной сегментацией
                     prediction.save("result_blood.jpg")
-                    st.image("result_blood.jpg", caption="Размеченный ИИ снимок", use_column_width=True)
+                    st.image("result_blood.jpg", caption="Размеченный ИИ снимок", use_container_width=True)
                     
                     # Получаем данные о найденных объектах
                     json_data = prediction.json()
