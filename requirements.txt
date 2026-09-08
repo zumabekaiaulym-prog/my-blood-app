@@ -4,5 +4,4 @@ pandas
 requests
 numpy
 opencv-python-headless
-roboflow
-fpdf
+reportlab
