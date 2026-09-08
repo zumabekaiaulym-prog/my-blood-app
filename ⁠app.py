@@ -7,9 +7,9 @@ st.set_page_config(page_title="BloodScan AI", layout="wide")
 st.title("BloodScan AI — Анализ снимка крови")
 
 # ==========================================
-# ДАННЫЕ ROBOFLOW
+# ОБНОВЛЕННЫЙ API КЛЮЧ
 # ==========================================
-ROBOFLOW_API_KEY = "rf_pzHlWjxsfSYLletbkunx4p4DRQk1"
+ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
 PROJECT_ID = "complete-blood-cell-analysis-1-yolo26n-seg-t1"
 VERSION_NUM = 1
 
