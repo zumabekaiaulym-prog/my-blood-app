@@ -207,11 +207,26 @@ if not history_df.empty:
 st.title(t["title"])
 
 # ==========================================
-# 2. ГЕНЕРАЦИЯ СТАБИЛЬНОГО PDF (БЕЗ ВОЗРАСТА)
+# 2. ИСПРАВЛЕННЫЙ ТРАНСЛИТЕРАТОР ДЛЯ PDF
 # ==========================================
 def clean_text(text):
-    """Очистка текста для защиты от сбоев шрифта Helvetica"""
-    return str(text).encode('latin-1', 'asciixml').decode('latin-1')
+    """Безопасное конвертирование текста в ASCII для ReportLab Helvetica"""
+    charmap = {
+        'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z',
+        'и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r',
+        'с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'sch',
+        'ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya',
+        'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Е':'E','Ё':'Yo','Ж':'Zh','З':'Z',
+        'И':'I','Й':'Y','К':'K','Л':'L','М':'M','Н':'N','О':'O','П':'P','Р':'R',
+        'С':'S','Т':'T','У':'U','Ф':'F','Х':'Kh','Ц':'Ts','Ч':'Ch','Ш':'Sh','Щ':'Sch',
+        'Ъ':'','Ы':'Y','Ь':'','Э':'E','Ю':'Yu','Я':'Ya',
+        'Ә':'A','ә':'a','Ғ':'G','ғ':'g','Қ':'K','қ':'k','Ң':'N','ң':'n',
+        'Ө':'O','ө':'o','Ұ':'U','ұ':'u','Ү':'U','ү':'u','Һ':'H','һ':'h'
+    }
+    result = []
+    for char in str(text):
+        result.append(charmap.get(char, char))
+    return "".join(result).encode('ascii', 'ignore').decode('ascii')
 
 def generate_pdf(p_id, counts, total, obs, recs, doc_name, doc_role, clinic):
     buffer = io.BytesIO()
@@ -232,7 +247,7 @@ def generate_pdf(p_id, counts, total, obs, recs, doc_name, doc_role, clinic):
     
     y = height - 100
     
-    # Patient Info Block (Без возраста)
+    # Patient Info Block
     c.setFillColor(colors.HexColor("#F0F4F8"))
     c.roundRect(40, y - 45, width - 80, 45, 6, fill=True, stroke=False)
     
