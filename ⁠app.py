@@ -5,19 +5,79 @@ import requests
 import io
 import numpy as np
 import cv2
+import sqlite3
+import json
+from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib import colors
 
 st.set_page_config(page_title="BloodScan AI", layout="wide")
 
 # ==========================================
-# 1. МУЛЬТИЯЗЫЧНОСТЬ
+# 0. ИНИЦИАЛИЗА БАЗЫ ДАННЫХ (SQLITE)
+# ==========================================
+def init_db():
+    conn = sqlite3.connect("bloodscan_history.db")
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            doctor_name TEXT,
+            doctor_role TEXT,
+            clinic TEXT,
+            patient_id TEXT,
+            patient_age TEXT,
+            total_count INTEGER,
+            counts_json TEXT,
+            observations_json TEXT,
+            recommendations_json TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_analysis(doc_name, doc_role, clinic, p_id, p_age, total, counts, obs, recs):
+    conn = sqlite3.connect("bloodscan_history.db")
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO history (
+            timestamp, doctor_name, doctor_role, clinic, 
+            patient_id, patient_age, total_count, 
+            counts_json, observations_json, recommendations_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        doc_name, doc_role, clinic, p_id, p_age, total,
+        json.dumps(counts, ensure_ascii=False),
+        json.dumps(obs, ensure_ascii=False),
+        json.dumps(recs, ensure_ascii=False)
+    ))
+    conn.commit()
+    conn.close()
+
+def get_history():
+    conn = sqlite3.connect("bloodscan_history.db")
+    df = pd.read_sql_query("SELECT * FROM history ORDER BY id DESC", conn)
+    conn.close()
+    return df
+
+init_db()
+
+# ==========================================
+# 1. МУЛЬТИЯЗЫЧНОСТЬ (TRANSLATIONS)
 # ==========================================
 translations = {
     "Русский": {
         "title": "🩸 BloodScan AI — Анализ снимка крови",
+        "account_title": "👤 Учетная запись",
+        "user_name": "Имя специалиста",
+        "user_role": "Должность / Роль",
+        "clinic_name": "Лаборатория / Клиника",
+        "history_title": "📜 История анализов",
+        "history_select": "Выберите анализ из базы",
         "patient_info": "📋 Данные пациента",
-        "p_name": "ФИО пациента",
         "p_age": "Возраст",
         "p_id": "ID / ИИН пациента",
         "source_title": "📸 Источник снимка с микроскопа",
@@ -33,14 +93,29 @@ translations = {
         "cell_type": "Тип клетки / объекта",
         "count": "Количество",
         "not_found": "Клетки не обнаружены.",
-        "download_pdf": "📄 Скачать PDF отчет",
+        "download_pdf": "📄 Скачать профессиональный PDF отчет",
         "diag_title": "🩺 Предварительная диагностика и рекомендации ИИ",
-        "disclaimer": "⚠️ Внимание: Результаты ИИ носят информационный характер и требуют подтверждения квалифицированным врачом."
+        "disclaimer": "⚠️ Внимание: Результаты ИИ носят информационный характер и требуют подтверждения квалифицированным врачом.",
+        "obs_wbc_high": "Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспалительный или инфекционный процесс.",
+        "rec_wbc_high": "Рекомендуется сдать развернутый анализ крови с лейкоцитарной формулой и C-реактивный белок (СРБ).",
+        "obs_wbc_low": "Низкий уровень лейкоцитов (Лейкопения). Снижен иммунный ответ.",
+        "rec_wbc_low": "Консультация гематолога / терапевта.",
+        "obs_plt_low": "Пониженное количество тромбоцитов (Тромбоцитопения). Риск замедленной свертываемости крови.",
+        "rec_plt_low": "Пройти коагулограмму (анализ на свертываемость).",
+        "obs_rbc_low": "Относительно низкая плотность эритроцитов. Возможный признак анемии.",
+        "rec_rbc_low": "Сдать анализ на ферритин, сывороточное железо и витамин B12.",
+        "obs_normal": "Соотношение основных форменных элементов крови в пределах визуальной нормы снимка.",
+        "rec_normal": "Плановый профилактический осмотр раз в год."
     },
     "Қазақша": {
         "title": "🩸 BloodScan AI — Қан үлгісін талдау",
+        "account_title": "👤 Пайдаланушы есептік жазбасы",
+        "user_name": "Маманның аты-жөні",
+        "user_role": "Қызметі / Рөлі",
+        "clinic_name": "Зертхана / Клиника",
+        "history_title": "📜 Талдаулар тарихы",
+        "history_select": "Дерекқордан талдауды таңдаңыз",
         "patient_info": "📋 Пациент мәліметтері",
-        "p_name": "Пациенттің Т.А.Ә.",
         "p_age": "Жасы",
         "p_id": "Пациенттің ID / ЖСН",
         "source_title": "📸 Микроскоптан сурет алу көзі",
@@ -56,14 +131,29 @@ translations = {
         "cell_type": "Жасуша / нысан түрі",
         "count": "Саны",
         "not_found": "Жасушалар табылмады.",
-        "download_pdf": "📄 PDF есепті жүктеу",
+        "download_pdf": "📄 Кәсіби PDF есепті жүктеу",
         "diag_title": "🩺 Алдын ала диагностика және ЖИ ұсыныстары",
-        "disclaimer": "⚠️ Назар аударыңыз: ЖИ нәтижелері ақпараттық сипатта және білікті дәрігердің растауын талап етеді."
+        "disclaimer": "⚠️ Назар аударыңыз: ЖИ нәтижелері ақпараттық сипатта және білікті дәрігердің растауын талап етеді.",
+        "obs_wbc_high": "Лейкоциттер деңгейінің жоғарылауы (Лейкоцитоз). Қабыну немесе инфекциялық процесс күдігі.",
+        "rec_wbc_high": "Лейкоцитарлық формуласы бар кеңейтілген қан талдауын және C-реактивті ақуызды (СРА) тапсыру ұсынылады.",
+        "obs_wbc_low": "Лейкоциттердің төмен деңгейі (Лейкопения). Иммундық жауап төмендеген.",
+        "rec_wbc_low": "Гематолог / терапевт кеңесі.",
+        "obs_plt_low": "Тромбоциттер санының төмендеуі (Тромбоцитопения). Қан ұюының баяулау қаупі.",
+        "rec_plt_low": "Коагулограммадан өту (қан ұю талдауы).",
+        "obs_rbc_low": "Эритроциттердің салыстырмалы түрде төмен тығыздығы. Анемияның ықтимал белгісі.",
+        "rec_rbc_low": "Ферритин, сарысулық темір және B12 витаминіне талдау тапсыру.",
+        "obs_normal": "Қанның негізгі пішінді элементтерінің арақатынасы суреттің визуалды нормасы шегінде.",
+        "rec_normal": "Жылына бір рет жоспарлы профилактикалық тексеру."
     },
     "English": {
         "title": "🩸 BloodScan AI — Blood Sample Analysis",
+        "account_title": "👤 User Account",
+        "user_name": "Specialist Name",
+        "user_role": "Position / Role",
+        "clinic_name": "Laboratory / Clinic",
+        "history_title": "📜 Analysis History",
+        "history_select": "Select analysis from database",
         "patient_info": "📋 Patient Information",
-        "p_name": "Patient Full Name",
         "p_age": "Age",
         "p_id": "Patient ID",
         "source_title": "📸 Microscope Image Source",
@@ -79,214 +169,342 @@ translations = {
         "cell_type": "Cell / Object Type",
         "count": "Count",
         "not_found": "No cells detected.",
-        "download_pdf": "📄 Download PDF Report",
+        "download_pdf": "📄 Download Professional PDF Report",
         "diag_title": "🩺 AI Preliminary Diagnostics & Recommendations",
-        "disclaimer": "⚠️ Disclaimer: AI results are informational and require confirmation by a qualified medical specialist."
+        "disclaimer": "⚠️ Disclaimer: AI results are informational and require confirmation by a qualified medical specialist.",
+        "obs_wbc_high": "Elevated leukocyte level (Leukocytosis). Suspected inflammatory or infectious process.",
+        "rec_wbc_high": "A detailed blood count with differential and C-reactive protein (CRP) test is recommended.",
+        "obs_wbc_low": "Low leukocyte level (Leukopenia). Decreased immune response.",
+        "rec_wbc_low": "Consultation with a hematologist / general practitioner.",
+        "obs_plt_low": "Decreased platelet count (Thrombocytopenia). Risk of delayed blood clotting.",
+        "rec_plt_low": "Perform a coagulation profile (coagulogram).",
+        "obs_rbc_low": "Relatively low erythrocyte density. Possible sign of anemia.",
+        "rec_rbc_low": "Test for ferritin, serum iron, and vitamin B12.",
+        "obs_normal": "Ratio of main blood cells is within the visual normal limits of the sample.",
+        "rec_normal": "Routine preventive checkup once a year."
     }
 }
 
+# Боковое меню: выбор языка и Учетная запись
 selected_lang = st.sidebar.selectbox("Language / Язык / Тіл", ["Русский", "Қазақша", "English"])
 t = translations[selected_lang]
+
+st.sidebar.markdown("---")
+st.sidebar.subheader(t["account_title"])
+account_name = st.sidebar.text_input(t["user_name"], value="Dr. Alex Smith")
+account_role = st.sidebar.text_input(t["user_role"], value="Lab Technologist")
+account_clinic = st.sidebar.text_input(t["clinic_name"], value="Central Clinical Lab")
+
+# Отображение истории в боковой панели
+st.sidebar.markdown("---")
+st.sidebar.subheader(t["history_title"])
+history_df = get_history()
+
+selected_history_id = None
+if not history_df.empty:
+    history_options = ["—"] + [f"[{row['timestamp']}] ID: {row['patient_id']}" for _, row in history_df.iterrows()]
+    selected_option = st.sidebar.selectbox(t["history_select"], history_options)
+    
+    if selected_option != "—":
+        selected_idx = history_options.index(selected_option) - 1
+        selected_history_row = history_df.iloc[selected_idx]
+        selected_history_id = selected_history_row["id"]
 
 st.title(t["title"])
 
 # ==========================================
-# 2. ДАННЫЕ ПАЦИЕНТА
+# 2. ПОДГОТОВКА PDF
 # ==========================================
-st.subheader(t["patient_info"])
-col_p1, col_p2, col_p3 = st.columns(3)
-
-with col_p1:
-    patient_name = st.text_input(t["p_name"], value="Ivanov I.I.")
-with col_p2:
-    patient_age = st.text_input(t["p_age"], value="35")
-with col_p3:
-    patient_id = st.text_input(t["p_id"], value="ID-100293")
-
-# ==========================================
-# 3. НАСТРОЙКИ МОДЕЛИ ROBOFLOW
-# ==========================================
-ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
-MODEL_ID = "complete-blood-cell-analysis/1"
-
-st.subheader(t["source_title"])
-source_mode = st.radio("", [t["source_option_1"], t["source_option_2"]])
-
-uploaded_file = None
-if source_mode == t["source_option_1"]:
-    uploaded_file = st.file_uploader(t["source_label"], type=["jpg", "jpeg", "png"])
-else:
-    uploaded_file = st.camera_input(t["source_title"])
-
-# ==========================================
-# 4. ЛОГИКА ДИАГНОСТИКИ И РЕКОМЕНДАЦИЙ
-# ==========================================
-def analyze_health(counts, total):
-    observations = []
-    recommendations = []
-    
-    if total == 0:
-        return ["Клетки не обнаружены"], ["Попробуйте загрузить другой снимок с четким фокусом."]
-        
-    rbc_count = counts.get("RBC", counts.get("Erythrocyte", 0))
-    wbc_count = counts.get("WBC", counts.get("Leukocyte", 0))
-    platelet_count = counts.get("Platelet", counts.get("Platelets", 0))
-    
-    # Расчет соотношений
-    wbc_ratio = (wbc_count / total) if total > 0 else 0
-    platelet_ratio = (platelet_count / total) if total > 0 else 0
-    
-    if wbc_ratio > 0.15:
-        observations.append("Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспалительный или инфекционный процесс.")
-        recommendations.append("Рекомендуется сдать развернутый анализ крови с лейкоцитарной формулой и C-реактивный белок (СРБ).")
-    elif wbc_count == 0 and total > 30:
-        observations.append("Низкий уровень лейкоцитов (Лейкопения). Снижен иммунный ответ.")
-        recommendations.append("Консультация гематолога / терапевта.")
-        
-    if platelet_ratio < 0.02 and total > 20:
-        observations.append("Пониженное количество тромбоцитов (Тромбоцитопения). Риск замедленной свертываемости крови.")
-        recommendations.append("Пройти коагулограмму (анализ на свертываемость).")
-        
-    if rbc_count / total < 0.70 if total > 0 else False:
-        observations.append("Относительно низкая плотность эритроцитов. Возможный признак анемии.")
-        recommendations.append("Сдать анализ на ферритин, сывороточное железо и витамин B12.")
-        
-    if not observations:
-        observations.append("Соотношение основных форменных элементов крови в пределах визуальной нормы снимка.")
-        recommendations.append("Плановый профилактический осмотр раз в год.")
-        
-    return observations, recommendations
-
-# Генерация PDF
-def generate_pdf(p_name, p_age, p_id, counts, total, obs, recs):
+def generate_pdf(p_id, p_age, counts, total, obs, recs, doc_name, doc_role, clinic):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
     
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, 750, "BloodScan AI — Diagnostic Report")
+    c.setFillColor(colors.HexColor("#003366"))
+    c.rect(0, height - 70, width, 70, fill=True, stroke=False)
     
-    c.setFont("Helvetica", 11)
-    c.drawString(50, 720, f"Patient Name: {p_name}")
-    c.drawString(50, 705, f"Age: {p_age}")
-    c.drawString(50, 690, f"Patient ID: {p_id}")
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(40, height - 42, "BLOODSCAN AI — DIAGNOSTIC REPORT")
+    
+    c.setFont("Helvetica", 10)
+    c.drawRightString(width - 40, height - 35, f"Facility: {clinic}")
+    c.drawRightString(width - 40, height - 50, f"Operator: {doc_name} ({doc_role})")
+    
+    y = height - 100
+    
+    c.setFillColor(colors.HexColor("#F0F4F8"))
+    c.roundRect(40, y - 45, width - 80, 45, 6, fill=True, stroke=False)
+    
+    c.setFillColor(colors.HexColor("#1A252C"))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(55, y - 20, f"Patient ID: {p_id}")
+    c.drawString(250, y - 20, f"Age: {p_age}")
+    c.drawString(400, y - 20, f"Total Objects Counted: {total}")
+    
+    y -= 70
     
     c.setFont("Helvetica-Bold", 13)
-    c.drawString(50, 655, f"Total Objects Found: {total}")
+    c.setFillColor(colors.HexColor("#003366"))
+    c.drawString(40, y, "1. Cell Analysis Statistics")
+    y -= 15
     
-    c.setFont("Helvetica", 11)
-    y = 635
-    for cell_class, count in counts.items():
-        c.drawString(70, y, f"- {cell_class}: {count}")
-        y -= 15
-        
-    y -= 15
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Observations:")
-    y -= 15
-    c.setFont("Helvetica", 10)
-    for o in obs:
-        c.drawString(60, y, f"* {o[:80]}")
-        y -= 15
-        
+    c.setStrokeColor(colors.HexColor("#CCCCCC"))
+    c.setLineWidth(0.5)
+    c.line(40, y, width - 40, y)
+    y -= 18
+    
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(colors.black)
+    c.drawString(60, y, "Cell / Object Type")
+    c.drawString(300, y, "Quantity")
     y -= 10
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Recommendations:")
-    y -= 15
+    c.line(40, y, width - 40, y)
+    y -= 18
+    
     c.setFont("Helvetica", 10)
-    for r in recs:
-        c.drawString(60, y, f"* {r[:80]}")
+    for cell_class, count in counts.items():
+        c.drawString(60, y, str(cell_class))
+        c.drawString(300, y, str(count))
+        y -= 16
+        
+    y -= 15
+    
+    c.setFont("Helvetica-Bold", 13)
+    c.setFillColor(colors.HexColor("#003366"))
+    c.drawString(40, y, "2. Clinical Observations & Detection")
+    y -= 15
+    c.line(40, y, width - 40, y)
+    y -= 18
+    
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.black)
+    for o in obs:
+        c.drawString(55, y, f"• {o[:85]}")
         y -= 15
         
-    y -= 25
-    c.setFont("Helvetica-Oblique", 8)
-    c.drawString(50, y, "Disclaimer: AI-generated report. Consult a physician for accurate medical diagnosis.")
+    y -= 15
+    
+    c.setFont("Helvetica-Bold", 13)
+    c.setFillColor(colors.HexColor("#003366"))
+    c.drawString(40, y, "3. Recommended Next Steps")
+    y -= 15
+    c.line(40, y, width - 40, y)
+    y -= 18
+    
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.black)
+    for r in recs:
+        c.drawString(55, y, f"-> {r[:85]}")
+        y -= 15
         
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColor(colors.HexColor("#777777"))
+    c.drawString(40, 30, "Disclaimer: Generated by BloodScan AI. Results require mandatory physician confirmation.")
+    
     c.showPage()
     c.save()
     buffer.seek(0)
     return buffer.getvalue()
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    col1, col2 = st.columns(2)
+# ==========================================
+# 3. ЕСЛИ ВЫБРАН АНАЛИЗ ИЗ ИСТОРИИ
+# ==========================================
+if selected_history_id is not None:
+    h_row = history_df[history_df["id"] == selected_history_id].iloc[0]
+    st.info(f"📜 Просмотр сохраненного анализа от {h_row['timestamp']}")
     
-    with col1:
-        st.image(image, caption=t["orig_img"], use_container_width=True)
+    col_h1, col_h2 = st.columns(2)
+    with col_h1:
+        st.write(f"**ID Пациента:** {h_row['patient_id']}")
+        st.write(f"**Возраст:** {h_row['patient_age']}")
+        st.write(f"**Лаборатория:** {h_row['clinic']}")
+    with col_h2:
+        st.write(f"**Специалист:** {h_row['doctor_name']} ({h_row['doctor_role']})")
+        st.write(f"**Всего клеток:** {h_row['total_count']}")
+        
+    h_counts = json.loads(h_row["counts_json"])
+    h_obs = json.loads(h_row["observations_json"])
+    h_recs = json.loads(h_row["recommendations_json"])
     
-    with col2:
-        st.subheader(t["ai_title"])
-        if st.button(t["btn_analyze"], use_container_width=True):
-            with st.spinner(t["analyzing"]):
-                try:
-                    img_byte_arr = io.BytesIO()
-                    image.convert("RGB").save(img_byte_arr, format='JPEG', quality=95)
-                    img_bytes = img_byte_arr.getvalue()
-                    
-                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=10"
-                    response = requests.post(
-                        url,
-                        files={"file": ("image.jpg", img_bytes, "image/jpeg")}
-                    )
-                    
-                    res_json = response.json()
-                    
-                    if "error" in res_json:
-                        st.error(f"Error: {res_json['error']}")
-                    else:
-                        predictions = res_json.get("predictions", [])
+    st.dataframe(pd.DataFrame(list(h_counts.items()), columns=[t["cell_type"], t["count"]]), use_container_width=True)
+    
+    st.subheader(t["diag_title"])
+    for o in h_obs:
+        st.warning(f"• {o}")
+    for r in h_recs:
+        st.info(f"👉 {r}")
+        
+    h_pdf = generate_pdf(
+        h_row['patient_id'], h_row['patient_age'], h_counts, 
+        h_row['total_count'], h_obs, h_recs,
+        h_row['doctor_name'], h_row['doctor_role'], h_row['clinic']
+    )
+    
+    st.download_button(
+        label=t["download_pdf"],
+        data=h_pdf,
+        file_name=f"BloodScan_Report_{h_row['patient_id']}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+
+else:
+    # ==========================================
+    # 4. НОВЫЙ АНАЛИЗ
+    # ==========================================
+    st.subheader(t["patient_info"])
+    col_p1, col_p2 = st.columns(2)
+
+    with col_p1:
+        patient_id = st.text_input(t["p_id"], value="ID-100293")
+    with col_p2:
+        patient_age = st.text_input(t["p_age"], value="35")
+
+    ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
+    MODEL_ID = "complete-blood-cell-analysis/1"
+
+    st.subheader(t["source_title"])
+    source_mode = st.radio("", [t["source_option_1"], t["source_option_2"]])
+
+    uploaded_file = None
+    if source_mode == t["source_option_1"]:
+        uploaded_file = st.file_uploader(t["source_label"], type=["jpg", "jpeg", "png"])
+    else:
+        uploaded_file = st.camera_input(t["source_title"])
+
+    def analyze_health(counts, total, lang_dict):
+        observations = []
+        recommendations = []
+        
+        if total == 0:
+            return [lang_dict["not_found"]], ["—"]
+            
+        rbc_count = counts.get("RBC", counts.get("Erythrocyte", 0))
+        wbc_count = counts.get("WBC", counts.get("Leukocyte", 0))
+        platelet_count = counts.get("Platelet", counts.get("Platelets", 0))
+        
+        wbc_ratio = (wbc_count / total) if total > 0 else 0
+        platelet_ratio = (platelet_count / total) if total > 0 else 0
+        
+        if wbc_ratio > 0.15:
+            observations.append(lang_dict["obs_wbc_high"])
+            recommendations.append(lang_dict["rec_wbc_high"])
+        elif wbc_count == 0 and total > 30:
+            observations.append(lang_dict["obs_wbc_low"])
+            recommendations.append(lang_dict["rec_wbc_low"])
+            
+        if platelet_ratio < 0.02 and total > 20:
+            observations.append(lang_dict["obs_plt_low"])
+            recommendations.append(lang_dict["rec_plt_low"])
+            
+        if rbc_count / total < 0.70 if total > 0 else False:
+            observations.append(lang_dict["obs_rbc_low"])
+            recommendations.append(lang_dict["rec_rbc_low"])
+            
+        if not observations:
+            observations.append(lang_dict["obs_normal"])
+            recommendations.append(lang_dict["rec_normal"])
+            
+        return observations, recommendations
+
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.image(image, caption=t["orig_img"], use_container_width=True)
+        
+        with col2:
+            st.subheader(t["ai_title"])
+            if st.button(t["btn_analyze"], use_container_width=True):
+                with st.spinner(t["analyzing"]):
+                    try:
+                        img_byte_arr = io.BytesIO()
+                        image.convert("RGB").save(img_byte_arr, format='JPEG', quality=95)
+                        img_bytes = img_byte_arr.getvalue()
                         
-                        cv_img = np.array(image.convert("RGB"))
-                        cv_img = cv2.cvtColor(cv_img, cv2.COLOR_RGB2BGR)
+                        url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=10"
+                        response = requests.post(
+                            url,
+                            files={"file": ("image.jpg", img_bytes, "image/jpeg")}
+                        )
                         
-                        counts = {}
-                        for p in predictions:
-                            cell_class = p.get("class", "Cell")
-                            confidence = p.get("confidence", 0)
-                            counts[cell_class] = counts.get(cell_class, 0) + 1
-                            
-                            x, y, w, h = int(p["x"]), int(p["y"]), int(p["width"]), int(p["height"])
-                            x1, y1 = int(x - w / 2), int(y - h / 2)
-                            x2, y2 = int(x + w / 2), int(y + h / 2)
-                            
-                            color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
-                            cv2.rectangle(cv_img, (x1, y1), (x2, y2), color, 2)
-                            cv2.putText(cv_img, f"{cell_class} {int(confidence * 100)}%", 
-                                        (x1, max(y1 - 10, 15)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+                        res_json = response.json()
                         
-                        result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-                        st.image(result_img, caption=t["annotated_img"], use_container_width=True)
-                        
-                        st.success(f"{t['total_found']}{len(predictions)}")
-                        
-                        if counts:
-                            df_result = pd.DataFrame(list(counts.items()), columns=[t["cell_type"], t["count"]])
-                            st.dataframe(df_result, use_container_width=True)
-                            
-                            # Диагностический блок
-                            st.markdown("---")
-                            st.subheader(t["diag_title"])
-                            
-                            obs, recs = analyze_health(counts, len(predictions))
-                            
-                            for o in obs:
-                                st.warning(f"• {o}")
-                            for r in recs:
-                                st.info(f"👉 {r}")
-                                
-                            st.caption(t["disclaimer"])
-                            
-                            # Генерация и скачивание PDF
-                            pdf_bytes = generate_pdf(patient_name, patient_age, patient_id, counts, len(predictions), obs, recs)
-                            
-                            st.download_button(
-                                label=t["download_pdf"],
-                                data=pdf_bytes,
-                                file_name=f"BloodScan_Report_{patient_id}.pdf",
-                                mime="application/pdf",
-                                use_container_width=True
-                            )
+                        if "error" in res_json:
+                            st.error(f"Error: {res_json['error']}")
                         else:
-                            st.warning(t["not_found"])
+                            predictions = res_json.get("predictions", [])
                             
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                            cv_img = np.array(image.convert("RGB"))
+                            cv_img = cv2.cvtColor(cv_img, cv2.COLOR_RGB2BGR)
+                            
+                            counts = {}
+                            for p in predictions:
+                                cell_class = p.get("class", "Cell")
+                                confidence = p.get("confidence", 0)
+                                counts[cell_class] = counts.get(cell_class, 0) + 1
+                                
+                                x, y, w, h = int(p["x"]), int(p["y"]), int(p["width"]), int(p["height"])
+                                x1, y1 = int(x - w / 2), int(y - h / 2)
+                                x2, y2 = int(x + w / 2), int(y + h / 2)
+                                
+                                color = (0, 255, 0) if cell_class == "RBC" else (255, 0, 0)
+                                cv2.rectangle(cv_img, (x1, y1), (x2, y2), color, 2)
+                                cv2.putText(cv_img, f"{cell_class} {int(confidence * 100)}%", 
+                                            (x1, max(y1 - 10, 15)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+                            
+                            result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+                            st.image(result_img, caption=t["annotated_img"], use_container_width=True)
+                            
+                            st.success(f"{t['total_found']}{len(predictions)}")
+                            
+                            if counts:
+                                df_result = pd.DataFrame(list(counts.items()), columns=[t["cell_type"], t["count"]])
+                                st.dataframe(df_result, use_container_width=True)
+                                
+                                st.markdown("---")
+                                st.subheader(t["diag_title"])
+                                
+                                obs, recs = analyze_health(counts, len(predictions), t)
+                                
+                                for o in obs:
+                                    st.warning(f"• {o}")
+                                for r in recs:
+                                    st.info(f"👉 {r}")
+                                    
+                                st.caption(t["disclaimer"])
+                                
+                                # Автоматическое сохранение результатов в базу данных
+                                save_analysis(
+                                    account_name, account_role, account_clinic,
+                                    patient_id, patient_age, len(predictions),
+                                    counts, obs, recs
+                                )
+                                st.toast("✅ Анализ сохранен в историю учетной записи!")
+                                
+                                pdf_bytes = generate_pdf(
+                                    patient_id, 
+                                    patient_age, 
+                                    counts, 
+                                    len(predictions), 
+                                    obs, 
+                                    recs,
+                                    account_name,
+                                    account_role,
+                                    account_clinic
+                                )
+                                
+                                st.download_button(
+                                    label=t["download_pdf"],
+                                    data=pdf_bytes,
+                                    file_name=f"BloodScan_Report_{patient_id}.pdf",
+                                    mime="application/pdf",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.warning(t["not_found"])
+                                
+                    except Exception as e:
+                        st.error(f"Error: {e}")
