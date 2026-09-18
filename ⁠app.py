@@ -28,7 +28,6 @@ def init_db():
             doctor_role TEXT,
             clinic TEXT,
             patient_id TEXT,
-            patient_age TEXT,
             total_count INTEGER,
             counts_json TEXT,
             observations_json TEXT,
@@ -38,18 +37,18 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_analysis(doc_name, doc_role, clinic, p_id, p_age, total, counts, obs, recs):
+def save_analysis(doc_name, doc_role, clinic, p_id, total, counts, obs, recs):
     conn = sqlite3.connect("bloodscan_history.db")
     c = conn.cursor()
     c.execute('''
         INSERT INTO history (
             timestamp, doctor_name, doctor_role, clinic, 
-            patient_id, patient_age, total_count, 
+            patient_id, total_count, 
             counts_json, observations_json, recommendations_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        doc_name, doc_role, clinic, p_id, p_age, total,
+        doc_name, doc_role, clinic, p_id, total,
         json.dumps(counts, ensure_ascii=False),
         json.dumps(obs, ensure_ascii=False),
         json.dumps(recs, ensure_ascii=False)
@@ -78,7 +77,6 @@ translations = {
         "history_title": "📜 История анализов",
         "history_select": "Выберите анализ из базы",
         "patient_info": "📋 Данные пациента",
-        "p_age": "Возраст",
         "p_id": "ID / ИИН пациента",
         "source_title": "📸 Источник снимка с микроскопа",
         "source_option_1": "Загрузить файл снимка",
@@ -96,15 +94,15 @@ translations = {
         "download_pdf": "📄 Скачать профессиональный PDF отчет",
         "diag_title": "🩺 Предварительная диагностика и рекомендации ИИ",
         "disclaimer": "⚠️ Внимание: Результаты ИИ носят информационный характер и требуют подтверждения квалифицированным врачом.",
-        "obs_wbc_high": "Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспалительный или инфекционный процесс.",
-        "rec_wbc_high": "Рекомендуется сдать развернутый анализ крови с лейкоцитарной формулой и C-реактивный белок (СРБ).",
+        "obs_wbc_high": "Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспалительный процесс.",
+        "rec_wbc_high": "Рекомендуется сдать развернутый анализ крови с лейкоцитарной формулой.",
         "obs_wbc_low": "Низкий уровень лейкоцитов (Лейкопения). Снижен иммунный ответ.",
         "rec_wbc_low": "Консультация гематолога / терапевта.",
-        "obs_plt_low": "Пониженное количество тромбоцитов (Тромбоцитопения). Риск замедленной свертываемости крови.",
+        "obs_plt_low": "Пониженное количество тромбоцитов (Тромбоцитопения).",
         "rec_plt_low": "Пройти коагулограмму (анализ на свертываемость).",
-        "obs_rbc_low": "Относительно низкая плотность эритроцитов. Возможный признак анемии.",
-        "rec_rbc_low": "Сдать анализ на ферритин, сывороточное железо и витамин B12.",
-        "obs_normal": "Соотношение основных форменных элементов крови в пределах визуальной нормы снимка.",
+        "obs_rbc_low": "Относительно низкая плотность эритроцитов. Признак анемии.",
+        "rec_rbc_low": "Сдать анализ на ферритин и сывороточное железо.",
+        "obs_normal": "Соотношение основных элементов крови в пределах нормы.",
         "rec_normal": "Плановый профилактический осмотр раз в год."
     },
     "Қазақша": {
@@ -116,7 +114,6 @@ translations = {
         "history_title": "📜 Талдаулар тарихы",
         "history_select": "Дерекқордан талдауды таңдаңыз",
         "patient_info": "📋 Пациент мәліметтері",
-        "p_age": "Жасы",
         "p_id": "Пациенттің ID / ЖСН",
         "source_title": "📸 Микроскоптан сурет алу көзі",
         "source_option_1": "Сурет файлын жүктеу",
@@ -134,16 +131,16 @@ translations = {
         "download_pdf": "📄 Кәсіби PDF есепті жүктеу",
         "diag_title": "🩺 Алдын ала диагностика және ЖИ ұсыныстары",
         "disclaimer": "⚠️ Назар аударыңыз: ЖИ нәтижелері ақпараттық сипатта және білікті дәрігердің растауын талап етеді.",
-        "obs_wbc_high": "Лейкоциттер деңгейінің жоғарылауы (Лейкоцитоз). Қабыну немесе инфекциялық процесс күдігі.",
-        "rec_wbc_high": "Лейкоцитарлық формуласы бар кеңейтілген қан талдауын және C-реактивті ақуызды (СРА) тапсыру ұсынылады.",
-        "obs_wbc_low": "Лейкоциттердің төмен деңгейі (Лейкопения). Иммундық жауап төмендеген.",
+        "obs_wbc_high": "Лейкоциттер деңгейінің жоғарылауы (Лейкоцитоз).",
+        "rec_wbc_high": "Кеңейтілген қан талдауын тапсыру ұсынылады.",
+        "obs_wbc_low": "Лейкоциттердің төмен деңгейі (Лейкопения).",
         "rec_wbc_low": "Гематолог / терапевт кеңесі.",
-        "obs_plt_low": "Тромбоциттер санының төмендеуі (Тромбоцитопения). Қан ұюының баяулау қаупі.",
-        "rec_plt_low": "Коагулограммадан өту (қан ұю талдауы).",
-        "obs_rbc_low": "Эритроциттердің салыстырмалы түрде төмен тығыздығы. Анемияның ықтимал белгісі.",
-        "rec_rbc_low": "Ферритин, сарысулық темір және B12 витаминіне талдау тапсыру.",
-        "obs_normal": "Қанның негізгі пішінді элементтерінің арақатынасы суреттің визуалды нормасы шегінде.",
-        "rec_normal": "Жылына бір рет жоспарлы профилактикалық тексеру."
+        "obs_plt_low": "Тромбоциттер санының төмендеуі (Тромбоцитопения).",
+        "rec_plt_low": "Коагулограммадан өту.",
+        "obs_rbc_low": "Эритроциттердің төмен тығыздығы. Анемия белгісі.",
+        "rec_rbc_low": "Ферритин мен темірге талдау тапсыру.",
+        "obs_normal": "Қан элементтерінің арақатынасы норма шегінде.",
+        "rec_normal": "Жоспарлы тексеру."
     },
     "English": {
         "title": "🩸 BloodScan AI — Blood Sample Analysis",
@@ -154,7 +151,6 @@ translations = {
         "history_title": "📜 Analysis History",
         "history_select": "Select analysis from database",
         "patient_info": "📋 Patient Information",
-        "p_age": "Age",
         "p_id": "Patient ID",
         "source_title": "📸 Microscope Image Source",
         "source_option_1": "Upload image file",
@@ -172,20 +168,19 @@ translations = {
         "download_pdf": "📄 Download Professional PDF Report",
         "diag_title": "🩺 AI Preliminary Diagnostics & Recommendations",
         "disclaimer": "⚠️ Disclaimer: AI results are informational and require confirmation by a qualified medical specialist.",
-        "obs_wbc_high": "Elevated leukocyte level (Leukocytosis). Suspected inflammatory or infectious process.",
-        "rec_wbc_high": "A detailed blood count with differential and C-reactive protein (CRP) test is recommended.",
-        "obs_wbc_low": "Low leukocyte level (Leukopenia). Decreased immune response.",
-        "rec_wbc_low": "Consultation with a hematologist / general practitioner.",
-        "obs_plt_low": "Decreased platelet count (Thrombocytopenia). Risk of delayed blood clotting.",
-        "rec_plt_low": "Perform a coagulation profile (coagulogram).",
-        "obs_rbc_low": "Relatively low erythrocyte density. Possible sign of anemia.",
-        "rec_rbc_low": "Test for ferritin, serum iron, and vitamin B12.",
-        "obs_normal": "Ratio of main blood cells is within the visual normal limits of the sample.",
-        "rec_normal": "Routine preventive checkup once a year."
+        "obs_wbc_high": "Elevated leukocyte level (Leukocytosis).",
+        "rec_wbc_high": "A detailed blood count test is recommended.",
+        "obs_wbc_low": "Low leukocyte level (Leukopenia).",
+        "rec_wbc_low": "Consultation with a hematologist.",
+        "obs_plt_low": "Decreased platelet count (Thrombocytopenia).",
+        "rec_plt_low": "Perform a coagulation profile.",
+        "obs_rbc_low": "Low erythrocyte density. Possible sign of anemia.",
+        "rec_rbc_low": "Test for ferritin and serum iron.",
+        "obs_normal": "Ratio of main blood cells is within normal limits.",
+        "rec_normal": "Routine preventive checkup."
     }
 }
 
-# Боковое меню: выбор языка и Учетная запись
 selected_lang = st.sidebar.selectbox("Language / Язык / Тіл", ["Русский", "Қазақша", "English"])
 t = translations[selected_lang]
 
@@ -195,7 +190,6 @@ account_name = st.sidebar.text_input(t["user_name"], value="Dr. Alex Smith")
 account_role = st.sidebar.text_input(t["user_role"], value="Lab Technologist")
 account_clinic = st.sidebar.text_input(t["clinic_name"], value="Central Clinical Lab")
 
-# Отображение истории в боковой панели
 st.sidebar.markdown("---")
 st.sidebar.subheader(t["history_title"])
 history_df = get_history()
@@ -213,13 +207,18 @@ if not history_df.empty:
 st.title(t["title"])
 
 # ==========================================
-# 2. ПОДГОТОВКА PDF
+# 2. ГЕНЕРАЦИЯ СТАБИЛЬНОГО PDF (БЕЗ ВОЗРАСТА)
 # ==========================================
-def generate_pdf(p_id, p_age, counts, total, obs, recs, doc_name, doc_role, clinic):
+def clean_text(text):
+    """Очистка текста для защиты от сбоев шрифта Helvetica"""
+    return str(text).encode('latin-1', 'asciixml').decode('latin-1')
+
+def generate_pdf(p_id, counts, total, obs, recs, doc_name, doc_role, clinic):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
+    # Header
     c.setFillColor(colors.HexColor("#003366"))
     c.rect(0, height - 70, width, 70, fill=True, stroke=False)
     
@@ -228,22 +227,23 @@ def generate_pdf(p_id, p_age, counts, total, obs, recs, doc_name, doc_role, clin
     c.drawString(40, height - 42, "BLOODSCAN AI — DIAGNOSTIC REPORT")
     
     c.setFont("Helvetica", 10)
-    c.drawRightString(width - 40, height - 35, f"Facility: {clinic}")
-    c.drawRightString(width - 40, height - 50, f"Operator: {doc_name} ({doc_role})")
+    c.drawRightString(width - 40, height - 35, f"Facility: {clean_text(clinic)}")
+    c.drawRightString(width - 40, height - 50, f"Operator: {clean_text(doc_name)} ({clean_text(doc_role)})")
     
     y = height - 100
     
+    # Patient Info Block (Без возраста)
     c.setFillColor(colors.HexColor("#F0F4F8"))
     c.roundRect(40, y - 45, width - 80, 45, 6, fill=True, stroke=False)
     
     c.setFillColor(colors.HexColor("#1A252C"))
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(55, y - 20, f"Patient ID: {p_id}")
-    c.drawString(250, y - 20, f"Age: {p_age}")
-    c.drawString(400, y - 20, f"Total Objects Counted: {total}")
+    c.drawString(55, y - 25, f"Patient ID: {clean_text(p_id)}")
+    c.drawString(320, y - 25, f"Total Objects Counted: {total}")
     
     y -= 70
     
+    # 1. Statistics
     c.setFont("Helvetica-Bold", 13)
     c.setFillColor(colors.HexColor("#003366"))
     c.drawString(40, y, "1. Cell Analysis Statistics")
@@ -264,12 +264,13 @@ def generate_pdf(p_id, p_age, counts, total, obs, recs, doc_name, doc_role, clin
     
     c.setFont("Helvetica", 10)
     for cell_class, count in counts.items():
-        c.drawString(60, y, str(cell_class))
+        c.drawString(60, y, clean_text(cell_class))
         c.drawString(300, y, str(count))
         y -= 16
         
     y -= 15
     
+    # 2. Observations
     c.setFont("Helvetica-Bold", 13)
     c.setFillColor(colors.HexColor("#003366"))
     c.drawString(40, y, "2. Clinical Observations & Detection")
@@ -280,11 +281,12 @@ def generate_pdf(p_id, p_age, counts, total, obs, recs, doc_name, doc_role, clin
     c.setFont("Helvetica", 10)
     c.setFillColor(colors.black)
     for o in obs:
-        c.drawString(55, y, f"• {o[:85]}")
+        c.drawString(55, y, f"- {clean_text(o[:80])}")
         y -= 15
         
     y -= 15
     
+    # 3. Recommendations
     c.setFont("Helvetica-Bold", 13)
     c.setFillColor(colors.HexColor("#003366"))
     c.drawString(40, y, "3. Recommended Next Steps")
@@ -295,12 +297,12 @@ def generate_pdf(p_id, p_age, counts, total, obs, recs, doc_name, doc_role, clin
     c.setFont("Helvetica", 10)
     c.setFillColor(colors.black)
     for r in recs:
-        c.drawString(55, y, f"-> {r[:85]}")
+        c.drawString(55, y, f"-> {clean_text(r[:80])}")
         y -= 15
         
     c.setFont("Helvetica-Oblique", 8)
     c.setFillColor(colors.HexColor("#777777"))
-    c.drawString(40, 30, "Disclaimer: Generated by BloodScan AI. Results require mandatory physician confirmation.")
+    c.drawString(40, 30, "Disclaimer: Generated by BloodScan AI. Results require medical confirmation.")
     
     c.showPage()
     c.save()
@@ -317,7 +319,6 @@ if selected_history_id is not None:
     col_h1, col_h2 = st.columns(2)
     with col_h1:
         st.write(f"**ID Пациента:** {h_row['patient_id']}")
-        st.write(f"**Возраст:** {h_row['patient_age']}")
         st.write(f"**Лаборатория:** {h_row['clinic']}")
     with col_h2:
         st.write(f"**Специалист:** {h_row['doctor_name']} ({h_row['doctor_role']})")
@@ -336,7 +337,7 @@ if selected_history_id is not None:
         st.info(f"👉 {r}")
         
     h_pdf = generate_pdf(
-        h_row['patient_id'], h_row['patient_age'], h_counts, 
+        h_row['patient_id'], h_counts, 
         h_row['total_count'], h_obs, h_recs,
         h_row['doctor_name'], h_row['doctor_role'], h_row['clinic']
     )
@@ -354,12 +355,7 @@ else:
     # 4. НОВЫЙ АНАЛИЗ
     # ==========================================
     st.subheader(t["patient_info"])
-    col_p1, col_p2 = st.columns(2)
-
-    with col_p1:
-        patient_id = st.text_input(t["p_id"], value="ID-100293")
-    with col_p2:
-        patient_age = st.text_input(t["p_age"], value="35")
+    patient_id = st.text_input(t["p_id"], value="ID-100293")
 
     ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
     MODEL_ID = "complete-blood-cell-analysis/1"
@@ -476,17 +472,15 @@ else:
                                     
                                 st.caption(t["disclaimer"])
                                 
-                                # Автоматическое сохранение результатов в базу данных
                                 save_analysis(
                                     account_name, account_role, account_clinic,
-                                    patient_id, patient_age, len(predictions),
+                                    patient_id, len(predictions),
                                     counts, obs, recs
                                 )
-                                st.toast("✅ Анализ сохранен в историю учетной записи!")
+                                st.toast("✅ Анализ сохранен в историю!")
                                 
                                 pdf_bytes = generate_pdf(
                                     patient_id, 
-                                    patient_age, 
                                     counts, 
                                     len(predictions), 
                                     obs, 
