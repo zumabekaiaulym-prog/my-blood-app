@@ -11,11 +11,12 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
+import urllib.parse
 
 st.set_page_config(page_title="BloodScan AI", layout="wide")
 
 # ==========================================
-# 0. ИНИЦИАЛИЗА БАЗЫ ДАННЫХ (SQLITE)
+# 0. ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ (SQLITE)
 # ==========================================
 def init_db():
     conn = sqlite3.connect("bloodscan_history.db")
@@ -28,6 +29,9 @@ def init_db():
             doctor_role TEXT,
             clinic TEXT,
             patient_id TEXT,
+            patient_name TEXT,
+            patient_age TEXT,
+            patient_gender TEXT,
             total_count INTEGER,
             counts_json TEXT,
             observations_json TEXT,
@@ -37,18 +41,18 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_analysis(doc_name, doc_role, clinic, p_id, total, counts, obs, recs):
+def save_analysis(doc_name, doc_role, clinic, p_id, p_name, p_age, p_gender, total, counts, obs, recs):
     conn = sqlite3.connect("bloodscan_history.db")
     c = conn.cursor()
     c.execute('''
         INSERT INTO history (
             timestamp, doctor_name, doctor_role, clinic, 
-            patient_id, total_count, 
+            patient_id, patient_name, patient_age, patient_gender, total_count, 
             counts_json, observations_json, recommendations_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        doc_name, doc_role, clinic, p_id, total,
+        doc_name, doc_role, clinic, p_id, p_name, p_age, p_gender, total,
         json.dumps(counts, ensure_ascii=False),
         json.dumps(obs, ensure_ascii=False),
         json.dumps(recs, ensure_ascii=False)
@@ -62,6 +66,14 @@ def get_history():
     conn.close()
     return df
 
+def get_patient_history(p_id):
+    if not p_id:
+        return pd.DataFrame()
+    conn = sqlite3.connect("bloodscan_history.db")
+    df = pd.read_sql_query(f"SELECT * FROM history WHERE patient_id = '{p_id}' ORDER BY id ASC", conn)
+    conn.close()
+    return df
+
 init_db()
 
 # ==========================================
@@ -70,14 +82,17 @@ init_db()
 translations = {
     "Русский": {
         "title": "🩸 BloodScan AI — Анализ снимка крови",
-        "account_title": "👤 Учетная запись",
+        "account_title": "👤 Учетная запись специалиста",
         "user_name": "Имя специалиста",
         "user_role": "Должность / Роль",
         "clinic_name": "Лаборатория / Клиника",
         "history_title": "📜 История анализов",
         "history_select": "Выберите анализ из базы",
-        "patient_info": "📋 Данные пациента",
+        "patient_info": "📋 Учетная запись пациента",
         "p_id": "ID / ИИН пациента",
+        "p_name": "ФИО пациента",
+        "p_age": "Возраст",
+        "p_gender": "Пол",
         "source_title": "📸 Источник снимка с микроскопа",
         "source_option_1": "Загрузить файл снимка",
         "source_option_2": "Сделать снимок с камеры / USB-микроскопа",
@@ -93,6 +108,8 @@ translations = {
         "not_found": "Клетки не обнаружены.",
         "download_pdf": "📄 Скачать профессиональный PDF отчет",
         "diag_title": "🩺 Предварительная диагностика и рекомендации ИИ",
+        "comparison_title": "📈 Сравнение с предыдущими анализами пациента",
+        "whatsapp_btn": "💬 Отправить результаты в WhatsApp",
         "disclaimer": "⚠️ Внимание: Результаты ИИ носят информационный характер и требуют подтверждения квалифицированным врачом.",
         "obs_wbc_high": "Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспалительный процесс.",
         "rec_wbc_high": "Рекомендуется сдать развернутый анализ крови с лейкоцитарной формулой.",
@@ -107,20 +124,23 @@ translations = {
     },
     "Қазақша": {
         "title": "🩸 BloodScan AI — Қан үлгісін талдау",
-        "account_title": "👤 Пайдаланушы есептік жазбасы",
+        "account_title": "👤 Маманның есептік жазбасы",
         "user_name": "Маманның аты-жөні",
         "user_role": "Қызметі / Рөлі",
         "clinic_name": "Зертхана / Клиника",
         "history_title": "📜 Талдаулар тарихы",
         "history_select": "Дерекқордан талдауды таңдаңыз",
-        "patient_info": "📋 Пациент мәліметтері",
+        "patient_info": "📋 Пациенттің есептік жазбасы",
         "p_id": "Пациенттің ID / ЖСН",
+        "p_name": "Пациенттің Аты-Жөні",
+        "p_age": "Жасы",
+        "p_gender": "Жынысы",
         "source_title": "📸 Микроскоптан сурет алу көзі",
         "source_option_1": "Сурет файлын жүктеу",
         "source_option_2": "Камерадан / USB-микроскоптан түсіру",
         "source_label": "Қан суретін таңдаңыз (JPG/PNG)",
         "orig_img": "Бастапқы сурет",
-        "ai_title": "🔬 ЖИ талдау нәтижесі",
+        "ai_title": "🔬 ЖИ талдау нәтижеси",
         "btn_analyze": "🔬 ЖИ арқылы талдау",
         "analyzing": "ЖИ қан жасушаларын санауда...",
         "annotated_img": "ЖИ белгілеген сурет",
@@ -130,6 +150,8 @@ translations = {
         "not_found": "Жасушалар табылмады.",
         "download_pdf": "📄 Кәсіби PDF есепті жүктеу",
         "diag_title": "🩺 Алдын ала диагностика және ЖИ ұсыныстары",
+        "comparison_title": "📈 Пациенттің бұрынғы талдауларымен салыстыру",
+        "whatsapp_btn": "💬 WhatsApp арқылы нәтиже жіберу",
         "disclaimer": "⚠️ Назар аударыңыз: ЖИ нәтижелері ақпараттық сипатта және білікті дәрігердің растауын талап етеді.",
         "obs_wbc_high": "Лейкоциттер деңгейінің жоғарылауы (Лейкоцитоз).",
         "rec_wbc_high": "Кеңейтілген қан талдауын тапсыру ұсынылады.",
@@ -144,14 +166,17 @@ translations = {
     },
     "English": {
         "title": "🩸 BloodScan AI — Blood Sample Analysis",
-        "account_title": "👤 User Account",
+        "account_title": "👤 Specialist Account",
         "user_name": "Specialist Name",
         "user_role": "Position / Role",
         "clinic_name": "Laboratory / Clinic",
         "history_title": "📜 Analysis History",
         "history_select": "Select analysis from database",
-        "patient_info": "📋 Patient Information",
-        "p_id": "Patient ID",
+        "patient_info": "📋 Patient Account Profile",
+        "p_id": "Patient ID / SSN",
+        "p_name": "Patient Full Name",
+        "p_age": "Age",
+        "p_gender": "Gender",
         "source_title": "📸 Microscope Image Source",
         "source_option_1": "Upload image file",
         "source_option_2": "Take a photo with Camera / USB Microscope",
@@ -167,6 +192,8 @@ translations = {
         "not_found": "No cells detected.",
         "download_pdf": "📄 Download Professional PDF Report",
         "diag_title": "🩺 AI Preliminary Diagnostics & Recommendations",
+        "comparison_title": "📈 Longitudinal Comparison with Past Results",
+        "whatsapp_btn": "💬 Send Results via WhatsApp",
         "disclaimer": "⚠️ Disclaimer: AI results are informational and require confirmation by a qualified medical specialist.",
         "obs_wbc_high": "Elevated leukocyte level (Leukocytosis).",
         "rec_wbc_high": "A detailed blood count test is recommended.",
@@ -196,7 +223,7 @@ history_df = get_history()
 
 selected_history_id = None
 if not history_df.empty:
-    history_options = ["—"] + [f"[{row['timestamp']}] ID: {row['patient_id']}" for _, row in history_df.iterrows()]
+    history_options = ["—"] + [f"[{row['timestamp']}] ID: {row['patient_id']} ({row['patient_name']})" for _, row in history_df.iterrows()]
     selected_option = st.sidebar.selectbox(t["history_select"], history_options)
     
     if selected_option != "—":
@@ -207,10 +234,9 @@ if not history_df.empty:
 st.title(t["title"])
 
 # ==========================================
-# 2. ИСПРАВЛЕННЫЙ ТРАНСЛИТЕРАТОР ДЛЯ PDF
+# 2. PDF GENERATOR
 # ==========================================
 def clean_text(text):
-    """Безопасное конвертирование текста в ASCII для ReportLab Helvetica"""
     charmap = {
         'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z',
         'и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r',
@@ -228,104 +254,77 @@ def clean_text(text):
         result.append(charmap.get(char, char))
     return "".join(result).encode('ascii', 'ignore').decode('ascii')
 
-def generate_pdf(p_id, counts, total, obs, recs, doc_name, doc_role, clinic):
+def generate_pdf(p_id, p_name, p_age, p_gender, counts, total, obs, recs, doc_name, doc_role, clinic):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    # Header
     c.setFillColor(colors.HexColor("#003366"))
     c.rect(0, height - 70, width, 70, fill=True, stroke=False)
     
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(40, height - 42, "BLOODSCAN AI — DIAGNOSTIC REPORT")
+    c.drawString(40, height - 42, "BLOODSCAN AI — REPORT")
     
     c.setFont("Helvetica", 10)
     c.drawRightString(width - 40, height - 35, f"Facility: {clean_text(clinic)}")
-    c.drawRightString(width - 40, height - 50, f"Operator: {clean_text(doc_name)} ({clean_text(doc_role)})")
+    c.drawRightString(width - 40, height - 50, f"Operator: {clean_text(doc_name)}")
     
     y = height - 100
     
-    # Patient Info Block
     c.setFillColor(colors.HexColor("#F0F4F8"))
-    c.roundRect(40, y - 45, width - 80, 45, 6, fill=True, stroke=False)
+    c.roundRect(40, y - 55, width - 80, 55, 6, fill=True, stroke=False)
     
     c.setFillColor(colors.HexColor("#1A252C"))
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(55, y - 25, f"Patient ID: {clean_text(p_id)}")
-    c.drawString(320, y - 25, f"Total Objects Counted: {total}")
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(55, y - 20, f"Patient ID: {clean_text(p_id)}")
+    c.drawString(55, y - 40, f"Patient Name: {clean_text(p_name)} ({p_age} yrs, {p_gender})")
+    c.drawString(340, y - 30, f"Total Cells Found: {total}")
     
-    y -= 70
+    y -= 80
     
-    # 1. Statistics
-    c.setFont("Helvetica-Bold", 13)
+    c.setFont("Helvetica-Bold", 12)
     c.setFillColor(colors.HexColor("#003366"))
     c.drawString(40, y, "1. Cell Analysis Statistics")
     y -= 15
-    
     c.setStrokeColor(colors.HexColor("#CCCCCC"))
     c.setLineWidth(0.5)
     c.line(40, y, width - 40, y)
     y -= 18
     
-    c.setFont("Helvetica-Bold", 11)
-    c.setFillColor(colors.black)
-    c.drawString(60, y, "Cell / Object Type")
-    c.drawString(300, y, "Quantity")
-    y -= 10
-    c.line(40, y, width - 40, y)
-    y -= 18
-    
-    c.setFont("Helvetica", 10)
     for cell_class, count in counts.items():
+        c.setFont("Helvetica", 10)
+        c.setFillColor(colors.black)
         c.drawString(60, y, clean_text(cell_class))
         c.drawString(300, y, str(count))
         y -= 16
         
-    y -= 15
-    
-    # 2. Observations
-    c.setFont("Helvetica-Bold", 13)
+    y -= 10
+    c.setFont("Helvetica-Bold", 12)
     c.setFillColor(colors.HexColor("#003366"))
-    c.drawString(40, y, "2. Clinical Observations & Detection")
+    c.drawString(40, y, "2. Clinical Findings & Recommendations")
     y -= 15
     c.line(40, y, width - 40, y)
     y -= 18
     
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.black)
     for o in obs:
-        c.drawString(55, y, f"- {clean_text(o[:80])}")
-        y -= 15
-        
-    y -= 15
-    
-    # 3. Recommendations
-    c.setFont("Helvetica-Bold", 13)
-    c.setFillColor(colors.HexColor("#003366"))
-    c.drawString(40, y, "3. Recommended Next Steps")
-    y -= 15
-    c.line(40, y, width - 40, y)
-    y -= 18
-    
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.black)
+        c.setFont("Helvetica", 9)
+        c.setFillColor(colors.black)
+        c.drawString(55, y, f"- {clean_text(o[:85])}")
+        y -= 14
     for r in recs:
-        c.drawString(55, y, f"-> {clean_text(r[:80])}")
-        y -= 15
+        c.setFont("Helvetica-Oblique", 9)
+        c.setFillColor(colors.HexColor("#004488"))
+        c.drawString(55, y, f"-> {clean_text(r[:85])}")
+        y -= 14
         
-    c.setFont("Helvetica-Oblique", 8)
-    c.setFillColor(colors.HexColor("#777777"))
-    c.drawString(40, 30, "Disclaimer: Generated by BloodScan AI. Results require medical confirmation.")
-    
     c.showPage()
     c.save()
     buffer.seek(0)
     return buffer.getvalue()
 
 # ==========================================
-# 3. ЕСЛИ ВЫБРАН АНАЛИЗ ИЗ ИСТОРИИ
+# 3. ПРОСМОТР ИСТОРИИ ИЗ БАЗЫ
 # ==========================================
 if selected_history_id is not None:
     h_row = history_df[history_df["id"] == selected_history_id].iloc[0]
@@ -333,7 +332,8 @@ if selected_history_id is not None:
     
     col_h1, col_h2 = st.columns(2)
     with col_h1:
-        st.write(f"**ID Пациента:** {h_row['patient_id']}")
+        st.write(f"**Пациент:** {h_row['patient_name']} (ID: {h_row['patient_id']})")
+        st.write(f"**Возраст / Пол:** {h_row['patient_age']} / {h_row['patient_gender']}")
         st.write(f"**Лаборатория:** {h_row['clinic']}")
     with col_h2:
         st.write(f"**Специалист:** {h_row['doctor_name']} ({h_row['doctor_role']})")
@@ -352,8 +352,8 @@ if selected_history_id is not None:
         st.info(f"👉 {r}")
         
     h_pdf = generate_pdf(
-        h_row['patient_id'], h_counts, 
-        h_row['total_count'], h_obs, h_recs,
+        h_row['patient_id'], h_row['patient_name'], h_row['patient_age'], h_row['patient_gender'],
+        h_counts, h_row['total_count'], h_obs, h_recs,
         h_row['doctor_name'], h_row['doctor_role'], h_row['clinic']
     )
     
@@ -367,10 +367,17 @@ if selected_history_id is not None:
 
 else:
     # ==========================================
-    # 4. НОВЫЙ АНАЛИЗ
+    # 4. НОВЫЙ АНАЛИЗ И СРАВНЕНИЕ
     # ==========================================
     st.subheader(t["patient_info"])
-    patient_id = st.text_input(t["p_id"], value="ID-100293")
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        patient_id = st.text_input(t["p_id"], value="ID-100293")
+    with col_p2:
+        patient_name = st.text_input(t["p_name"], value="John Doe")
+    with col_p3:
+        patient_age = st.text_input(t["p_age"], value="32")
+        patient_gender = st.selectbox(t["p_gender"], ["Male", "Female", "Other"])
 
     ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
     MODEL_ID = "complete-blood-cell-analysis/1"
@@ -475,6 +482,34 @@ else:
                                 df_result = pd.DataFrame(list(counts.items()), columns=[t["cell_type"], t["count"]])
                                 st.dataframe(df_result, use_container_width=True)
                                 
+                                # ==========================================
+                                # СРАВНЕНИЕ С ПРОШЛЫМИ АНАЛИЗАМИ
+                                # ==========================================
+                                past_scans = get_patient_history(patient_id)
+                                if not past_scans.empty:
+                                    st.markdown("---")
+                                    st.subheader(t["comparison_title"])
+                                    last_scan = past_scans.iloc[-1]
+                                    last_counts = json.loads(last_scan["counts_json"])
+                                    
+                                    st.write(f"📅 Сравнение с предыдущим тестом от: **{last_scan['timestamp']}**")
+                                    
+                                    comp_data = []
+                                    all_keys = set(list(counts.keys()) + list(last_counts.keys()))
+                                    for k in all_keys:
+                                        curr_val = counts.get(k, 0)
+                                        past_val = last_counts.get(k, 0)
+                                        diff = curr_val - past_val
+                                        status = "📈 Улучшение / Рост" if diff > 0 else ("📉 Снижение" if diff < 0 else "➖ Без изменений")
+                                        comp_data.append({
+                                            "Компонент": k,
+                                            "Прошлый анализ": past_val,
+                                            "Текущий анализ": curr_val,
+                                            "Разница": diff,
+                                            "Динамика": status
+                                        })
+                                    st.dataframe(pd.DataFrame(comp_data), use_container_width=True)
+                                
                                 st.markdown("---")
                                 st.subheader(t["diag_title"])
                                 
@@ -489,20 +524,15 @@ else:
                                 
                                 save_analysis(
                                     account_name, account_role, account_clinic,
-                                    patient_id, len(predictions),
-                                    counts, obs, recs
+                                    patient_id, patient_name, patient_age, patient_gender,
+                                    len(predictions), counts, obs, recs
                                 )
                                 st.toast("✅ Анализ сохранен в историю!")
                                 
                                 pdf_bytes = generate_pdf(
-                                    patient_id, 
-                                    counts, 
-                                    len(predictions), 
-                                    obs, 
-                                    recs,
-                                    account_name,
-                                    account_role,
-                                    account_clinic
+                                    patient_id, patient_name, patient_age, patient_gender,
+                                    counts, len(predictions), obs, recs,
+                                    account_name, account_role, account_clinic
                                 )
                                 
                                 st.download_button(
@@ -512,6 +542,19 @@ else:
                                     mime="application/pdf",
                                     use_container_width=True
                                 )
+                                
+                                # ==========================================
+                                # WHATSAPP SHARE BUTTON
+                                # ==========================================
+                                wa_text = f"🩸 *BloodScan AI Report*\n👤 Patient: {patient_name} (ID: {patient_id})\n🔬 Total Cells: {len(predictions)}\n\n*Findings:*\n" + "\n".join([f"• {o}" for o in obs]) + "\n\n*Recommendations:*\n" + "\n".join([f"👉 {r}" for r in recs])
+                                encoded_wa_text = urllib.parse.quote(wa_text)
+                                whatsapp_url = f"https://wa.me/?text={encoded_wa_text}"
+                                
+                                st.markdown(
+                                    f'<a href="{whatsapp_url}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:10px;">{t["whatsapp_btn"]}</button></a>',
+                                    unsafe_allow_html=True
+                                )
+                                
                             else:
                                 st.warning(t["not_found"])
                                 
