@@ -13,24 +13,20 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 import urllib.parse
 
-# Настройка страницы и кастомные CSS стили для дизайна ScanHemo AI
+# Настройка страницы
 st.set_page_config(page_title="ScanHemo AI", layout="wide", initial_sidebar_state="expanded")
 
+# Кастомные стили CSS
 st.markdown("""
 <style>
-    /* Главный фон и шрифты */
     .stApp {
         background-color: #EBF2F5;
         font-family: 'Segoe UI', Roboto, sans-serif;
     }
-    
-    /* Стилизация боковой панели */
     [data-testid="stSidebar"] {
         background-color: #D9E6EB;
         border-right: 1px solid #C4D7E0;
     }
-    
-    /* Карточки пациентов */
     .patient-card {
         background-color: #FFFFFF;
         border-radius: 12px;
@@ -39,30 +35,19 @@ st.markdown("""
         border: 1px solid #E0E8EC;
         text-align: center;
         margin-bottom: 12px;
-        transition: transform 0.2s;
     }
-    
-    .patient-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Заголовки и логотипы */
     .brand-title {
         color: #1A5265;
         font-weight: 800;
-        font-size: 32px;
+        font-size: 28px;
         margin-bottom: 0px;
     }
-    
-    /* Кастомные кнопки */
     .stButton>button {
         background-color: #1E6075;
         color: white;
         border-radius: 8px;
         border: none;
         font-weight: 600;
-        padding: 8px 16px;
     }
     .stButton>button:hover {
         background-color: #154656;
@@ -138,40 +123,153 @@ def get_patient_history(p_id):
 
 init_db()
 
-# Session State для авторизации и навигации
+# ==========================================
+# 1. МУЛЬТИЯЗЫЧНОСТЬ (3 ЯЗЫКА)
+# ==========================================
+translations = {
+    "Русский": {
+        "title": "ScanHemo AI 🩸",
+        "login_title": "Вход в систему лабораторной диагностики",
+        "btn_login": "Войти",
+        "nav_patients": "👥 Пациенты",
+        "nav_analysis": "🔬 Анализы & Сканирование",
+        "nav_stats": "📊 Статистика & Сравнение",
+        "nav_settings": "⚙️ Настройки",
+        "nav_logout": "🚪 Выйти",
+        "patient_list": "Пациент list",
+        "add_patient": "➕ Зарегистрировать нового пациента",
+        "p_id": "ID / ИИН пациента",
+        "p_name": "ФИО пациента",
+        "p_dob": "Дата рождения",
+        "p_gender": "Пол",
+        "select_patient": "Выбрать пациента",
+        "selected_patient_title": "📋 Данные пациента:",
+        "btn_new_scan": "🔬 Сделать новый анализ",
+        "btn_view_history": "📜 Посмотреть предыдущие данные & динамику",
+        "upload_label": "Загрузите микроскопический снимок крови",
+        "orig_img": "Исходный снимок",
+        "ai_result": "Результат размещения ИИ",
+        "btn_analyze": "🔬 Проанализировать через ИИ",
+        "analyzing": "ИИ считает клетки крови...",
+        "total_found": "Найдено объектов: ",
+        "download_pdf": "📄 Скачать PDF отчет",
+        "send_whatsapp": "💬 Отправить результаты в WhatsApp",
+        "diag_title": "🩺 Предварительная диагностика ИИ",
+        "comparison_title": "📈 Сравнение с предыдущими анализами",
+        "obs_wbc_high": "Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспаление.",
+        "rec_wbc_high": "Рекомендуется сдать развернутый анализ крови.",
+        "obs_normal": "Соотношение основных элементов крови в пределах нормы.",
+        "rec_normal": "Плановый профилактический осмотр раз в год."
+    },
+    "Қазақша": {
+        "title": "ScanHemo AI 🩸",
+        "login_title": "Зертханалық диагностика жүйесіне кіру",
+        "btn_login": "Кіру",
+        "nav_patients": "👥 Пациенттер",
+        "nav_analysis": "🔬 Талдау & Сканерлеу",
+        "nav_stats": "📊 Статистика & Салыстыру",
+        "nav_settings": "⚙️ Баптаулар",
+        "nav_logout": "🚪 Шығу",
+        "patient_list": "Пациенттер тізімі",
+        "add_patient": "➕ Жаңа пациентті тіркеу",
+        "p_id": "Пациент ID / ЖСН",
+        "p_name": "Пациенттің Аты-Жөні",
+        "p_dob": "Туған күні",
+        "p_gender": "Жынысы",
+        "select_patient": "Пациентті таңдау",
+        "selected_patient_title": "📋 Пациент мәліметтері:",
+        "btn_new_scan": "🔬 Жаңа талдау жасау",
+        "btn_view_history": "📜 Бұрынғы нәтижелерді & динамиканы қарау",
+        "upload_label": "Микроскоптан алынған қан суретін жүктеңіз",
+        "orig_img": "Бастапқы сурет",
+        "ai_result": "ЖИ белгілеген нәтиже",
+        "btn_analyze": "🔬 ЖИ арқылы талдау",
+        "analyzing": "ЖИ қан жасушаларын санауда...",
+        "total_found": "Табылған нысандар саны: ",
+        "download_pdf": "📄 PDF есепті жүктеу",
+        "send_whatsapp": "💬 Нәтижелерді WhatsApp арқылы жіберу",
+        "diag_title": "🩺 ЖИ алдын ала диагностикасы",
+        "comparison_title": "📈 Бұрынғы талдаулармен салыстыру",
+        "obs_wbc_high": "Лейкоциттер деңгейінің жоғарылауы (Лейкоцитоз).",
+        "rec_wbc_high": "Кеңейтілген қан талдауын тапсыру ұсынылады.",
+        "obs_normal": "Қан элементтерінің арақатынасы норма шегінде.",
+        "rec_normal": "Жоспарлы тексеру."
+    },
+    "English": {
+        "title": "ScanHemo AI 🩸",
+        "login_title": "Laboratory Diagnostics System Login",
+        "btn_login": "Log In",
+        "nav_patients": "👥 Patients",
+        "nav_analysis": "🔬 Analysis & Scanning",
+        "nav_stats": "📊 Statistics & Comparison",
+        "nav_settings": "⚙️ Settings",
+        "nav_logout": "🚪 Log Out",
+        "patient_list": "Patient List",
+        "add_patient": "➕ Register New Patient",
+        "p_id": "Patient ID / SSN",
+        "p_name": "Patient Full Name",
+        "p_dob": "Date of Birth",
+        "p_gender": "Gender",
+        "select_patient": "Select Patient",
+        "selected_patient_title": "📋 Patient Profile:",
+        "btn_new_scan": "🔬 Perform New Analysis",
+        "btn_view_history": "📜 View Past History & Trends",
+        "upload_label": "Upload blood sample image from microscope",
+        "orig_img": "Original Image",
+        "ai_result": "AI Annotated Image",
+        "btn_analyze": "🔬 Analyze with AI",
+        "analyzing": "AI is counting blood cells...",
+        "total_found": "Total Objects Found: ",
+        "download_pdf": "📄 Download PDF Report",
+        "send_whatsapp": "💬 Send Results via WhatsApp",
+        "diag_title": "🩺 AI Diagnostic Findings",
+        "comparison_title": "📈 Comparison with Previous Results",
+        "obs_wbc_high": "Elevated leukocyte count (Leukocytosis).",
+        "rec_wbc_high": "A detailed blood count test is recommended.",
+        "obs_normal": "Blood cell ratios are within normal ranges.",
+        "rec_normal": "Routine annual checkup."
+    }
+}
+
+# Сессия 상태
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "Пациенты"
 if "selected_patient_id" not in st.session_state:
     st.session_state["selected_patient_id"] = None
+if "selected_patient_name" not in st.session_state:
+    st.session_state["selected_patient_name"] = ""
+if "selected_patient_dob" not in st.session_state:
+    st.session_state["selected_patient_dob"] = ""
+
+# Выбор языка на боковой панели
+selected_lang = st.sidebar.selectbox("🌐 Язык / Тіл / Language", ["Русский", "Қазақша", "English"])
+t = translations[selected_lang]
 
 # ==========================================
-# 1. ЭКРАН АВТОРИЗАЦИИ (LOGIN)
+# 2. АВТОРИЗАЦИЯ
 # ==========================================
 if not st.session_state["authenticated"]:
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        with st.container():
-            st.markdown("<h1 style='text-align: center; color: #1E6075;'>ScanHemo 🩸</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: #555;'>Вход в систему лабораторной диагностики</p>", unsafe_allow_html=True)
-            
-            doc_name = st.text_input("Имя специалиста", value="Dr. Alex Smith")
-            doc_role = st.text_input("Должность / Роль", value="Лаборант-технолог")
-            clinic_name = st.text_input("Лаборатория / Клиника", value="Центральная клиническая лаборатория")
-            password = st.text_input("Пароль", type="password", value="******")
-            
-            if st.button("Войти", use_container_width=True):
-                st.session_state["authenticated"] = True
-                st.session_state["doc_name"] = doc_name
-                st.session_state["doc_role"] = doc_role
-                st.session_state["clinic_name"] = clinic_name
-                st.rerun()
+        st.markdown(f"<h1 style='text-align: center; color: #1E6075;'>{t['title']}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: #555;'>{t['login_title']}</p>", unsafe_allow_html=True)
+        
+        doc_name = st.text_input("Имя специалиста", value="Dr. Alex Smith")
+        doc_role = st.text_input("Должность / Роль", value="Лаборант-технолог")
+        clinic_name = st.text_input("Лаборатория / Клиника", value="Центральная клиническая лаборатория")
+        password = st.text_input("Пароль", type="password", value="******")
+        
+        if st.button(t["btn_login"], use_container_width=True):
+            st.session_state["authenticated"] = True
+            st.session_state["doc_name"] = doc_name
+            st.session_state["doc_role"] = doc_role
+            st.session_state["clinic_name"] = clinic_name
+            st.rerun()
     st.stop()
 
 # ==========================================
-# 2. МЕНЮ НАВИГАЦИИ (БОКОВАЯ ПАНЕЛЬ)
+# 3. НАВИГАЦИЯ БОКОВОЙ ПАНЕЛИ
 # ==========================================
 with st.sidebar:
     st.markdown("<h2 class='brand-title'>ScanHemo AI</h2>", unsafe_allow_html=True)
@@ -181,43 +279,88 @@ with st.sidebar:
     
     page = st.radio(
         "Навигация",
-        ["👥 Пациенты", "🔬 Анализы & Сканирование", "📊 Статистика & Сравнение", "⚙️ Настройки"],
+        [t["nav_patients"], t["nav_analysis"], t["nav_stats"], t["nav_settings"]],
         label_visibility="collapsed"
     )
     
     st.markdown("---")
-    if st.button("🚪 Выйти", use_container_width=True):
+    if st.button(t["nav_logout"], use_container_width=True):
         st.session_state["authenticated"] = False
         st.rerun()
 
-# ==========================================
-# 3. СТРАНИЦА: ПАЦИЕНТЫ (СПИСОК И КАРТОЧКИ)
-# ==========================================
-if page == "👥 Пациенты":
-    st.title("Пациент list")
+# Функция генерации PDF
+def clean_text(text):
+    charmap = {
+        'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z',
+        'и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r',
+        'с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'sch',
+        'ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya',
+        'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Е':'E','Ё':'Yo','Ж':'Zh','З':'Z',
+        'И':'I','Й':'Y','К':'K','Л':'L','М':'M','Н':'N','О':'O','П':'P','Р':'R',
+        'С':'S','Т':'T','У':'U','Ф':'F','Х':'Kh','Ц':'Ts','Ч':'Ch','Ш':'Sh','Щ':'Sch',
+        'Ъ':'','Ы':'Y','Ь':'','Э':'E','Ю':'Yu','Я':'Ya'
+    }
+    return "".join([charmap.get(c, c) for c in str(text)]).encode('ascii', 'ignore').decode('ascii')
+
+def generate_pdf(p_id, p_name, p_dob, counts, total, obs, recs, doc_name, clinic):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
     
-    # Кнопка добавления нового пациента
-    with st.expander("➕ Зарегистрировать нового пациента"):
+    c.setFillColor(colors.HexColor("#1E6075"))
+    c.rect(0, height - 60, width, 60, fill=True, stroke=False)
+    
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, height - 38, "SCANHEMO AI — BLOOD DIAGNOSTIC REPORT")
+    
+    y = height - 90
+    c.setFillColor(colors.HexColor("#F0F4F8"))
+    c.roundRect(40, y - 45, width - 80, 45, 6, fill=True, stroke=False)
+    
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(55, y - 20, f"Patient: {clean_text(p_name)} (ID: {clean_text(p_id)})")
+    c.drawString(55, y - 35, f"DOB: {clean_text(p_dob)} | Facility: {clean_text(clinic)}")
+    
+    y -= 65
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, y, "Cell Count Summary:")
+    y -= 15
+    
+    for k, v in counts.items():
+        c.setFont("Helvetica", 10)
+        c.drawString(55, y, f"{clean_text(k)}: {v}")
+        y -= 15
+        
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+# ==========================================
+# 4. РАЗДЕЛ: ПАЦИЕНТЫ
+# ==========================================
+if page == t["nav_patients"]:
+    st.title(t["patient_list"])
+    
+    with st.expander(t["add_patient"]):
         col_n1, col_n2, col_n3 = st.columns(3)
         with col_n1:
-            new_id = st.text_input("ID / ИИН", value="110002084")
+            new_id = st.text_input(t["p_id"], value="115002084")
         with col_n2:
-            new_name = st.text_input("ФИО Пациента", value="Иванов Иван Иванович")
+            new_name = st.text_input(t["p_name"], value="Иванов Иван Иванович")
         with col_n3:
-            new_dob = st.text_input("Дата рождения", value="27.03.1999")
+            new_dob = st.text_input(t["p_dob"], value="27.03.1999")
             
     history_df = get_history()
     
-    # Фильтрация уникальных пациентов
-    if not history_df.empty and 'patient_id' in history_df.columns:
-        patients = history_df[['patient_id', 'patient_name', 'patient_dob']].drop_duplicates()
-    else:
-        patients = pd.DataFrame([
-            {"patient_id": "100000284", "patient_name": "Иванов Иван Иванович", "patient_dob": "25.07.1993"},
-            {"patient_id": "150002038", "patient_name": "Иванова Анна Сергеевна", "patient_dob": "27.05.1998"},
-            {"patient_id": "115002084", "patient_name": "Иванов Иван Иванович", "patient_dob": "27.03.1999"},
-            {"patient_id": "130002634", "patient_name": "Петров Пётр Петрович", "patient_dob": "25.02.1983"}
-        ])
+    patients = pd.DataFrame([
+        {"patient_id": "100000284", "patient_name": "Иванов Иван Иванович", "patient_dob": "25.07.1993"},
+        {"patient_id": "150002038", "patient_name": "Иванова Анна Сергеевна", "patient_dob": "27.05.1998"},
+        {"patient_id": "115002084", "patient_name": "Иванов Иван Иванович", "patient_dob": "27.03.1999"},
+        {"patient_id": "130002634", "patient_name": "Петров Пётр Петрович", "patient_dob": "25.02.1983"}
+    ])
 
     cols = st.columns(4)
     for idx, p in patients.iterrows():
@@ -225,40 +368,54 @@ if page == "👥 Пациенты":
         with col:
             st.markdown(f"""
             <div class='patient-card'>
-                <div style='font-size: 40px;'>👤</div>
+                <div style='font-size: 35px;'>👤</div>
                 <h4 style='margin: 5px 0; color: #1E6075;'>{p['patient_name']}</h4>
-                <p style='margin: 0; color: #777; font-size: 13px;'>ID: {p['patient_id']}</p>
-                <p style='margin: 0; color: #777; font-size: 13px;'>Дождн: {p['patient_dob']}</p>
+                <p style='margin: 0; color: #777; font-size: 12px;'>ID: {p['patient_id']}</p>
+                <p style='margin: 0; color: #777; font-size: 12px;'>Дождн: {p['patient_dob']}</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("Выбрать пациента", key=f"btn_{p['patient_id']}", use_container_width=True):
+            if st.button(t["select_patient"], key=f"btn_{p['patient_id']}", use_container_width=True):
                 st.session_state["selected_patient_id"] = p['patient_id']
                 st.session_state["selected_patient_name"] = p['patient_name']
                 st.session_state["selected_patient_dob"] = p['patient_dob']
-                st.toast(f"Выбран пациент: {p['patient_name']}")
+
+    # ПОКАЗ ВЫБРАННОГО ПАЦИЕНТА И ДЕЙСТВИЙ
+    if st.session_state["selected_patient_id"]:
+        st.markdown("---")
+        st.subheader(f"{t['selected_patient_title']} {st.session_state['selected_patient_name']} (ID: {st.session_state['selected_patient_id']})")
+        
+        act_col1, act_col2 = st.columns(2)
+        with act_col1:
+            if st.button(t["btn_new_scan"], use_container_width=True):
+                st.info("Перейдите во вкладку '🔬 Анализы & Сканирование' в меню слева.")
+        with act_col2:
+            if st.button(t["btn_view_history"], use_container_width=True):
+                st.info("Перейдите во вкладку '📊 Статистика & Сравнение' в меню слева.")
 
 # ==========================================
-# 4. СТРАНИЦА: АНАЛИЗЫ & СКАНИРОВАНИЕ
+# 5. РАЗДЕЛ: АНАЛИЗЫ & СКАНИРОВАНИЕ
 # ==========================================
-elif page == "🔬 Анализы & Сканирование":
-    st.title("Сканирование и обработка снимка крови")
+elif page == t["nav_analysis"]:
+    st.title(t["nav_analysis"])
     
-    col_sel1, col_sel2 = st.columns(2)
+    col_sel1, col_sel2, col_sel3 = st.columns(3)
     with col_sel1:
-        p_id = st.text_input("ID / ИИН пациента", value=st.session_state.get("selected_patient_id", "115002084"))
+        p_id = st.text_input(t["p_id"], value=st.session_state.get("selected_patient_id", "115002084"))
     with col_sel2:
-        p_name = st.text_input("ФИО пациента", value=st.session_state.get("selected_patient_name", "Иванов Иван Иванович"))
+        p_name = st.text_input(t["p_name"], value=st.session_state.get("selected_patient_name", "Иванов Иван Иванович"))
+    with col_sel3:
+        p_dob = st.text_input(t["p_dob"], value=st.session_state.get("selected_patient_dob", "27.03.1999"))
         
-    uploaded_file = st.file_uploader("Загрузите микроскопический снимок", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
     
     if uploaded_file:
         image = Image.open(uploaded_file)
         c1, c2 = st.columns(2)
         with c1:
-            st.image(image, caption="Исходный снимок", use_container_width=True)
+            st.image(image, caption=t["orig_img"], use_container_width=True)
         with c2:
-            if st.button("🔬 Проанализировать через ИИ", use_container_width=True):
-                with st.spinner("ИИ анализирует снимок..."):
+            if st.button(t["btn_analyze"], use_container_width=True):
+                with st.spinner(t["analyzing"]):
                     ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
                     MODEL_ID = "complete-blood-cell-analysis/1"
                     img_byte_arr = io.BytesIO()
@@ -281,49 +438,63 @@ elif page == "🔬 Анализы & Сканирование":
                         cv2.rectangle(cv_img, (int(x-w/2), int(y-h/2)), (int(x+w/2), int(y+h/2)), (0, 255, 0), 2)
                     
                     result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-                    st.image(result_img, caption="Результат размеченный ИИ", use_container_width=True)
-                    st.dataframe(pd.DataFrame(list(counts.items()), columns=["Тип клетки", "Количество"]), use_container_width=True)
+                    st.image(result_img, caption=t["ai_result"], use_container_width=True)
+                    st.success(f"{t['total_found']}{len(predictions)}")
+                    st.dataframe(pd.DataFrame(list(counts.items()), columns=["Тип", "Количество"]), use_container_width=True)
+                    
+                    obs = [t["obs_normal"]]
+                    recs = [t["rec_normal"]]
                     
                     save_analysis(
                         st.session_state.get('doc_name'), st.session_state.get('doc_role'), 
-                        st.session_state.get('clinic_name'), p_id, p_name, "27.03.1999", "Мужской",
-                        len(predictions), counts, ["Анализ завершен"], ["Рекомендуется плановый просмотр"]
+                        st.session_state.get('clinic_name'), p_id, p_name, p_dob, "Мужской",
+                        len(predictions), counts, obs, recs
                     )
-                    st.success("Анализ сохранен в базу ScanHemo AI!")
+                    
+                    # ГЕНЕРАЦИЯ PDF
+                    pdf_bytes = generate_pdf(
+                        p_id, p_name, p_dob, counts, len(predictions), obs, recs,
+                        st.session_state.get('doc_name'), st.session_state.get('clinic_name')
+                    )
+                    
+                    col_dl1, col_dl2 = st.columns(2)
+                    with col_dl1:
+                        st.download_button(
+                            label=t["download_pdf"],
+                            data=pdf_bytes,
+                            file_name=f"ScanHemo_Report_{p_id}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                    with col_dl2:
+                        wa_text = f"🩸 *ScanHemo AI Report*\n👤 Patient: {p_name} (ID: {p_id})\n🔬 Total Cells: {len(predictions)}\nCounts: {json.dumps(counts)}"
+                        whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
+                        st.markdown(
+                            f'<a href="{whatsapp_url}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">{t["send_whatsapp"]}</button></a>',
+                            unsafe_allow_html=True
+                        )
 
 # ==========================================
-# 5. СТРАНИЦА: СТАТИСТИКА & СРАВНЕНИЕ (ДИЗAЙН С МАКЕТА)
+# 6. РАЗДЕЛ: СТАТИСТИКА & СРАВНЕНИЕ
 # ==========================================
-elif page == "📊 Статистика & Сравнение":
-    st.title("Сравнение с предыдущими анализами")
+elif page == t["nav_stats"]:
+    st.title(t["comparison_title"])
     
-    col_c1, col_c2 = st.columns(2)
-    with col_c1:
-        p1 = st.selectbox("Выбрать первый анализ / пациента", ["Иванов Иван Иванович", "Геранта Иван Иванович"])
-    with col_c2:
-        p2 = st.selectbox("Выбрать второй анализ для сравнения", ["Геранта Иван Иванович", "Иванов Иван Иванович"])
-        
-    st.button("Сравнение", use_container_width=False)
+    curr_id = st.session_state.get("selected_patient_id", "115002084")
+    p_history = get_patient_history(curr_id)
     
-    # Визуальные графики сравнения показателей (как на вашем макете)
+    st.write(f"👤 Пациент: **{st.session_state.get('selected_patient_name', 'Иванов Иван Иванович')}** (ID: {curr_id})")
+    
     g1, g2 = st.columns(2)
     with g1:
         st.subheader("RBC / WBC Динамика (↑↑)")
-        chart_data1 = pd.DataFrame(
-            np.random.randn(10, 2) + [100, 80],
-            columns=['Текущий', "Прошлый"]
-        )
+        chart_data1 = pd.DataFrame(np.random.randn(10, 2) + [100, 80], columns=['Текущий', "Прошлый"])
         st.line_chart(chart_data1)
-        
     with g2:
         st.subheader("RA / RC Плотность (↓↓)")
-        chart_data2 = pd.DataFrame(
-            np.random.randn(10, 2) + [50, 40],
-            columns=['Текущий', "Прошлый"]
-        )
+        chart_data2 = pd.DataFrame(np.random.randn(10, 2) + [50, 40], columns=['Текущий', "Прошлый"])
         st.area_chart(chart_data2)
 
-    # Таблица сравнения компонентов
     st.subheader("Сводная таблица показателей")
     table_data = pd.DataFrame({
         'Компонент': ['RBC', 'WBC', 'Platelets'],
@@ -335,12 +506,10 @@ elif page == "📊 Статистика & Сравнение":
     st.dataframe(table_data, use_container_width=True)
 
 # ==========================================
-# 6. СТРАНИЦА: НАСТРОЙКИ
+# 7. РАЗДЕЛ: НАСТРОЙКИ
 # ==========================================
-elif page == "⚙️ Настройки":
-    st.title("Настройки профиля и системы")
+elif page == t["nav_settings"]:
+    st.title(t["nav_settings"])
     st.text_input("Название клиники", value=st.session_state.get('clinic_name'))
     st.text_input("ФИО Специалиста", value=st.session_state.get('doc_name'))
-    st.text_input("Язык интерфейса", value="Русский")
-    st.checkbox("Включить автоматическую генерацию PDF", value=True)
-    st.button("Сохранить настройки")
+    st.button("Сохранить изменения")
