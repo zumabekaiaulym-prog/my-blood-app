@@ -16,7 +16,7 @@ import urllib.parse
 st.set_page_config(page_title="BloodScan AI", layout="wide")
 
 # ==========================================
-# 0. ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ (SQLITE)
+# 0. ИНИЦИАЛИЗАЦИЯ И МИГРАЦИЯ БАЗЫ ДАННЫХ
 # ==========================================
 def init_db():
     conn = sqlite3.connect("bloodscan_history.db")
@@ -38,6 +38,13 @@ def init_db():
             recommendations_json TEXT
         )
     ''')
+    
+    # Автоматическая миграция: добавление отсутствующих колонок в существующую старую базу
+    existing_cols = [col[1] for col in c.execute("PRAGMA table_info(history)").fetchall()]
+    for new_col in ["patient_name", "patient_age", "patient_gender"]:
+        if new_col not in existing_cols:
+            c.execute(f"ALTER TABLE history ADD COLUMN {new_col} TEXT DEFAULT ''")
+            
     conn.commit()
     conn.close()
 
@@ -93,6 +100,9 @@ translations = {
         "p_name": "ФИО пациента",
         "p_age": "Возраст",
         "p_gender": "Пол",
+        "gender_male": "Мужской",
+        "gender_female": "Женский",
+        "gender_other": "Другой",
         "source_title": "📸 Источник снимка с микроскопа",
         "source_option_1": "Загрузить файл снимка",
         "source_option_2": "Сделать снимок с камеры / USB-микроскопа",
@@ -135,12 +145,15 @@ translations = {
         "p_name": "Пациенттің Аты-Жөні",
         "p_age": "Жасы",
         "p_gender": "Жынысы",
+        "gender_male": "Ер",
+        "gender_female": "Әйел",
+        "gender_other": "Басқа",
         "source_title": "📸 Микроскоптан сурет алу көзі",
         "source_option_1": "Сурет файлын жүктеу",
         "source_option_2": "Камерадан / USB-микроскоптан түсіру",
         "source_label": "Қан суретін таңдаңыз (JPG/PNG)",
         "orig_img": "Бастапқы сурет",
-        "ai_title": "🔬 ЖИ талдау нәтижеси",
+        "ai_title": "🔬 ЖИ талдау нәтижесі",
         "btn_analyze": "🔬 ЖИ арқылы талдау",
         "analyzing": "ЖИ қан жасушаларын санауда...",
         "annotated_img": "ЖИ белгілеген сурет",
@@ -177,6 +190,9 @@ translations = {
         "p_name": "Patient Full Name",
         "p_age": "Age",
         "p_gender": "Gender",
+        "gender_male": "Male",
+        "gender_female": "Female",
+        "gender_other": "Other",
         "source_title": "📸 Microscope Image Source",
         "source_option_1": "Upload image file",
         "source_option_2": "Take a photo with Camera / USB Microscope",
@@ -223,7 +239,14 @@ history_df = get_history()
 
 selected_history_id = None
 if not history_df.empty:
-    history_options = ["—"] + [f"[{row['timestamp']}] ID: {row['patient_id']} ({row['patient_name']})" for _, row in history_df.iterrows()]
+    history_options = ["—"]
+    for _, row in history_df.iterrows():
+        p_name = row.get("patient_name", "")
+        name_str = f" ({p_name})" if pd.notna(p_name) and p_name else ""
+        p_id = row.get("patient_id", "N/A")
+        ts = row.get("timestamp", "")
+        history_options.append(f"[{ts}] ID: {p_id}{name_str}")
+        
     selected_option = st.sidebar.selectbox(t["history_select"], history_options)
     
     if selected_option != "—":
@@ -234,7 +257,7 @@ if not history_df.empty:
 st.title(t["title"])
 
 # ==========================================
-# 2. PDF GENERATOR
+# 2. PDF ГЕНЕРАТОР
 # ==========================================
 def clean_text(text):
     charmap = {
@@ -264,11 +287,11 @@ def generate_pdf(p_id, p_name, p_age, p_gender, counts, total, obs, recs, doc_na
     
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(40, height - 42, "BLOODSCAN AI — REPORT")
+    c.drawString(40, height - 42, "BLOODSCAN AI — DIAGNOSTIC REPORT")
     
     c.setFont("Helvetica", 10)
     c.drawRightString(width - 40, height - 35, f"Facility: {clean_text(clinic)}")
-    c.drawRightString(width - 40, height - 50, f"Operator: {clean_text(doc_name)}")
+    c.drawRightString(width - 40, height - 50, f"Operator: {clean_text(doc_name)} ({clean_text(doc_role)})")
     
     y = height - 100
     
@@ -279,7 +302,7 @@ def generate_pdf(p_id, p_name, p_age, p_gender, counts, total, obs, recs, doc_na
     c.setFont("Helvetica-Bold", 10)
     c.drawString(55, y - 20, f"Patient ID: {clean_text(p_id)}")
     c.drawString(55, y - 40, f"Patient Name: {clean_text(p_name)} ({p_age} yrs, {p_gender})")
-    c.drawString(340, y - 30, f"Total Cells Found: {total}")
+    c.drawString(340, y - 30, f"Total Objects Counted: {total}")
     
     y -= 80
     
@@ -332,12 +355,12 @@ if selected_history_id is not None:
     
     col_h1, col_h2 = st.columns(2)
     with col_h1:
-        st.write(f"**Пациент:** {h_row['patient_name']} (ID: {h_row['patient_id']})")
-        st.write(f"**Возраст / Пол:** {h_row['patient_age']} / {h_row['patient_gender']}")
-        st.write(f"**Лаборатория:** {h_row['clinic']}")
+        st.write(f"**Пациент:** {h_row.get('patient_name', 'N/A')} (ID: {h_row.get('patient_id', 'N/A')})")
+        st.write(f"**Возраст / Пол:** {h_row.get('patient_age', 'N/A')} / {h_row.get('patient_gender', 'N/A')}")
+        st.write(f"**Лаборатория:** {h_row.get('clinic', 'N/A')}")
     with col_h2:
-        st.write(f"**Специалист:** {h_row['doctor_name']} ({h_row['doctor_role']})")
-        st.write(f"**Всего клеток:** {h_row['total_count']}")
+        st.write(f"**Специалист:** {h_row.get('doctor_name', 'N/A')} ({h_row.get('doctor_role', 'N/A')})")
+        st.write(f"**Всего клеток:** {h_row.get('total_count', 0)}")
         
     h_counts = json.loads(h_row["counts_json"])
     h_obs = json.loads(h_row["observations_json"])
@@ -352,15 +375,15 @@ if selected_history_id is not None:
         st.info(f"👉 {r}")
         
     h_pdf = generate_pdf(
-        h_row['patient_id'], h_row['patient_name'], h_row['patient_age'], h_row['patient_gender'],
-        h_counts, h_row['total_count'], h_obs, h_recs,
-        h_row['doctor_name'], h_row['doctor_role'], h_row['clinic']
+        h_row.get('patient_id', ''), h_row.get('patient_name', ''), h_row.get('patient_age', ''), h_row.get('patient_gender', ''),
+        h_counts, h_row.get('total_count', 0), h_obs, h_recs,
+        h_row.get('doctor_name', ''), h_row.get('doctor_role', ''), h_row.get('clinic', '')
     )
     
     st.download_button(
         label=t["download_pdf"],
         data=h_pdf,
-        file_name=f"BloodScan_Report_{h_row['patient_id']}.pdf",
+        file_name=f"BloodScan_Report_{h_row.get('patient_id', 'id')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
@@ -377,7 +400,7 @@ else:
         patient_name = st.text_input(t["p_name"], value="John Doe")
     with col_p3:
         patient_age = st.text_input(t["p_age"], value="32")
-        patient_gender = st.selectbox(t["p_gender"], ["Male", "Female", "Other"])
+        patient_gender = st.selectbox(t["p_gender"], [t["gender_male"], t["gender_female"], t["gender_other"]])
 
     ROBOFLOW_API_KEY = "NJw10P0PWJp9Ee4A3uF1"
     MODEL_ID = "complete-blood-cell-analysis/1"
@@ -500,7 +523,7 @@ else:
                                         curr_val = counts.get(k, 0)
                                         past_val = last_counts.get(k, 0)
                                         diff = curr_val - past_val
-                                        status = "📈 Улучшение / Рост" if diff > 0 else ("📉 Снижение" if diff < 0 else "➖ Без изменений")
+                                        status = "📈 Рост" if diff > 0 else ("📉 Снижение" if diff < 0 else "➖ Без изменений")
                                         comp_data.append({
                                             "Компонент": k,
                                             "Прошлый анализ": past_val,
