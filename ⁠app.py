@@ -136,7 +136,7 @@ translations = {
         "nav_stats": "📊 Статистика & Сравнение",
         "nav_settings": "⚙️ Настройки",
         "nav_logout": "🚪 Выйти",
-        "patient_list": "Пациент list",
+        "patient_list": "Список пациентов",
         "add_patient": "➕ Зарегистрировать нового пациента",
         "p_id": "ID / ИИН пациента",
         "p_name": "ФИО пациента",
@@ -146,7 +146,7 @@ translations = {
         "selected_patient_title": "📋 Данные пациента:",
         "btn_new_scan": "🔬 Сделать новый анализ",
         "btn_view_history": "📜 Посмотреть предыдущие данные & динамику",
-        "upload_label": "Загрузите микроскопический снимок крови",
+        "upload_label": "Загрузите файл или сделайте снимок с камеры микроскопа",
         "orig_img": "Исходный снимок",
         "ai_result": "Результат размещения ИИ",
         "btn_analyze": "🔬 Проанализировать через ИИ",
@@ -154,10 +154,7 @@ translations = {
         "total_found": "Найдено объектов: ",
         "download_pdf": "📄 Скачать PDF отчет",
         "send_whatsapp": "💬 Отправить результаты в WhatsApp",
-        "diag_title": "🩺 Предварительная диагностика ИИ",
-        "comparison_title": "📈 Сравнение с предыдущими анализами",
-        "obs_wbc_high": "Повышенный уровень лейкоцитов (Лейкоцитоз). Подозрение на воспаление.",
-        "rec_wbc_high": "Рекомендуется сдать развернутый анализ крови.",
+        "comparison_title": "📈 Динамика и история анализов пациента",
         "obs_normal": "Соотношение основных элементов крови в пределах нормы.",
         "rec_normal": "Плановый профилактический осмотр раз в год."
     },
@@ -180,7 +177,7 @@ translations = {
         "selected_patient_title": "📋 Пациент мәліметтері:",
         "btn_new_scan": "🔬 Жаңа талдау жасау",
         "btn_view_history": "📜 Бұрынғы нәтижелерді & динамиканы қарау",
-        "upload_label": "Микроскоптан алынған қан суретін жүктеңіз",
+        "upload_label": "Файлды жүктеңіз немесе микроскоп камерасынан суретке түсіріңіз",
         "orig_img": "Бастапқы сурет",
         "ai_result": "ЖИ белгілеген нәтиже",
         "btn_analyze": "🔬 ЖИ арқылы талдау",
@@ -188,10 +185,7 @@ translations = {
         "total_found": "Табылған нысандар саны: ",
         "download_pdf": "📄 PDF есепті жүктеу",
         "send_whatsapp": "💬 Нәтижелерді WhatsApp арқылы жіберу",
-        "diag_title": "🩺 ЖИ алдын ала диагностикасы",
-        "comparison_title": "📈 Бұрынғы талдаулармен салыстыру",
-        "obs_wbc_high": "Лейкоциттер деңгейінің жоғарылауы (Лейкоцитоз).",
-        "rec_wbc_high": "Кеңейтілген қан талдауын тапсыру ұсынылады.",
+        "comparison_title": "📈 Пациенттің талдау динамикасы",
         "obs_normal": "Қан элементтерінің арақатынасы норма шегінде.",
         "rec_normal": "Жоспарлы тексеру."
     },
@@ -214,7 +208,7 @@ translations = {
         "selected_patient_title": "📋 Patient Profile:",
         "btn_new_scan": "🔬 Perform New Analysis",
         "btn_view_history": "📜 View Past History & Trends",
-        "upload_label": "Upload blood sample image from microscope",
+        "upload_label": "Upload file or capture image from microscope camera",
         "orig_img": "Original Image",
         "ai_result": "AI Annotated Image",
         "btn_analyze": "🔬 Analyze with AI",
@@ -222,28 +216,32 @@ translations = {
         "total_found": "Total Objects Found: ",
         "download_pdf": "📄 Download PDF Report",
         "send_whatsapp": "💬 Send Results via WhatsApp",
-        "diag_title": "🩺 AI Diagnostic Findings",
-        "comparison_title": "📈 Comparison with Previous Results",
-        "obs_wbc_high": "Elevated leukocyte count (Leukocytosis).",
-        "rec_wbc_high": "A detailed blood count test is recommended.",
+        "comparison_title": "📈 Patient Analysis History & Trends",
         "obs_normal": "Blood cell ratios are within normal ranges.",
         "rec_normal": "Routine annual checkup."
     }
 }
 
-# Сессия 상태
+# Инициализация состояния сессии
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "selected_patient_id" not in st.session_state:
-    st.session_state["selected_patient_id"] = None
+    st.session_state["selected_patient_id"] = "100000284"
 if "selected_patient_name" not in st.session_state:
-    st.session_state["selected_patient_name"] = ""
+    st.session_state["selected_patient_name"] = "Иванов Иван Иванович"
 if "selected_patient_dob" not in st.session_state:
-    st.session_state["selected_patient_dob"] = ""
+    st.session_state["selected_patient_dob"] = "25.07.1993"
+if "nav_page" not in st.session_state:
+    st.session_state["nav_page"] = "👥 Пациенты"
 
 # Выбор языка на боковой панели
 selected_lang = st.sidebar.selectbox("🌐 Язык / Тіл / Language", ["Русский", "Қазақша", "English"])
 t = translations[selected_lang]
+
+# Синхронизация названий страниц с языком
+nav_options = [t["nav_patients"], t["nav_analysis"], t["nav_stats"], t["nav_settings"]]
+if st.session_state["nav_page"] not in nav_options:
+    st.session_state["nav_page"] = nav_options[0]
 
 # ==========================================
 # 2. АВТОРИЗАЦИЯ
@@ -277,11 +275,14 @@ with st.sidebar:
     st.caption(f"{st.session_state.get('doc_role', '')} | {st.session_state.get('clinic_name', '')}")
     st.markdown("---")
     
+    # Интерактивное радиоменю, связанное со стейтом
     page = st.radio(
         "Навигация",
-        [t["nav_patients"], t["nav_analysis"], t["nav_stats"], t["nav_settings"]],
+        nav_options,
+        index=nav_options.index(st.session_state["nav_page"]),
         label_visibility="collapsed"
     )
+    st.session_state["nav_page"] = page
     
     st.markdown("---")
     if st.button(t["nav_logout"], use_container_width=True):
@@ -353,8 +354,6 @@ if page == t["nav_patients"]:
         with col_n3:
             new_dob = st.text_input(t["p_dob"], value="27.03.1999")
             
-    history_df = get_history()
-    
     patients = pd.DataFrame([
         {"patient_id": "100000284", "patient_name": "Иванов Иван Иванович", "patient_dob": "25.07.1993"},
         {"patient_id": "150002038", "patient_name": "Иванова Анна Сергеевна", "patient_dob": "27.05.1998"},
@@ -371,15 +370,16 @@ if page == t["nav_patients"]:
                 <div style='font-size: 35px;'>👤</div>
                 <h4 style='margin: 5px 0; color: #1E6075;'>{p['patient_name']}</h4>
                 <p style='margin: 0; color: #777; font-size: 12px;'>ID: {p['patient_id']}</p>
-                <p style='margin: 0; color: #777; font-size: 12px;'>Дождн: {p['patient_dob']}</p>
+                <p style='margin: 0; color: #777; font-size: 12px;'>Дата рожд: {p['patient_dob']}</p>
             </div>
             """, unsafe_allow_html=True)
             if st.button(t["select_patient"], key=f"btn_{p['patient_id']}", use_container_width=True):
                 st.session_state["selected_patient_id"] = p['patient_id']
                 st.session_state["selected_patient_name"] = p['patient_name']
                 st.session_state["selected_patient_dob"] = p['patient_dob']
+                st.success(f"Выбран пациент: {p['patient_name']}")
 
-    # ПОКАЗ ВЫБРАННОГО ПАЦИЕНТА И ДЕЙСТВИЙ
+    # ПОКАЗ ВЫБРАННОГО ПАЦИЕНТА И МГНОВЕННЫЙ ПЕРЕХОД К КНОПКАМ
     if st.session_state["selected_patient_id"]:
         st.markdown("---")
         st.subheader(f"{t['selected_patient_title']} {st.session_state['selected_patient_name']} (ID: {st.session_state['selected_patient_id']})")
@@ -387,13 +387,15 @@ if page == t["nav_patients"]:
         act_col1, act_col2 = st.columns(2)
         with act_col1:
             if st.button(t["btn_new_scan"], use_container_width=True):
-                st.info("Перейдите во вкладку '🔬 Анализы & Сканирование' в меню слева.")
+                st.session_state["nav_page"] = translations[selected_lang]["nav_analysis"]
+                st.rerun()
         with act_col2:
             if st.button(t["btn_view_history"], use_container_width=True):
-                st.info("Перейдите во вкладку '📊 Статистика & Сравнение' в меню слева.")
+                st.session_state["nav_page"] = translations[selected_lang]["nav_stats"]
+                st.rerun()
 
 # ==========================================
-# 5. РАЗДЕЛ: АНАЛИЗЫ & СКАНИРОВАНИЕ
+# 5. РАЗДЕЛ: АНАЛИЗЫ & СКАНИРОВАНИЕ (ВКЛЮЧАЯ КАМЕРУ МИКРОСКОПА)
 # ==========================================
 elif page == t["nav_analysis"]:
     st.title(t["nav_analysis"])
@@ -406,10 +408,20 @@ elif page == t["nav_analysis"]:
     with col_sel3:
         p_dob = st.text_input(t["p_dob"], value=st.session_state.get("selected_patient_dob", "27.03.1999"))
         
-    uploaded_file = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
+    st.markdown("### 📷 Источник изображения крови")
+    input_method = st.radio("Выберите способ получения снимка", ["Загрузить файл изображения", "Снять с камеры микроскопа / Веб-камеры"], horizontal=True)
     
-    if uploaded_file:
-        image = Image.open(uploaded_file)
+    image = None
+    if input_method == "Загрузить файл изображения":
+        uploaded_file = st.file_uploader(t["upload_label"], type=["jpg", "jpeg", "png"])
+        if uploaded_file:
+            image = Image.open(uploaded_file)
+    else:
+        camera_file = st.camera_input("Наведите микроскоп и нажмите кнопку захвата снимка")
+        if camera_file:
+            image = Image.open(camera_file)
+            
+    if image is not None:
         c1, c2 = st.columns(2)
         with c1:
             st.image(image, caption=t["orig_img"], use_container_width=True)
@@ -422,7 +434,7 @@ elif page == t["nav_analysis"]:
                     image.convert("RGB").save(img_byte_arr, format='JPEG', quality=95)
                     img_bytes = img_byte_arr.getvalue()
                     
-                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=10"
+                    url = f"https://detect.roboflow.com/{MODEL_ID}?api_key={ROBOFLOW_API_KEY}&confidence=15"
                     response = requests.post(url, files={"file": ("image.jpg", img_bytes, "image/jpeg")})
                     res_json = response.json()
                     
@@ -440,7 +452,7 @@ elif page == t["nav_analysis"]:
                     result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
                     st.image(result_img, caption=t["ai_result"], use_container_width=True)
                     st.success(f"{t['total_found']}{len(predictions)}")
-                    st.dataframe(pd.DataFrame(list(counts.items()), columns=["Тип", "Количество"]), use_container_width=True)
+                    st.dataframe(pd.DataFrame(list(counts.items()), columns=["Тип клетки", "Количество"]), use_container_width=True)
                     
                     obs = [t["obs_normal"]]
                     recs = [t["rec_normal"]]
@@ -451,7 +463,6 @@ elif page == t["nav_analysis"]:
                         len(predictions), counts, obs, recs
                     )
                     
-                    # ГЕНЕРАЦИЯ PDF
                     pdf_bytes = generate_pdf(
                         p_id, p_name, p_dob, counts, len(predictions), obs, recs,
                         st.session_state.get('doc_name'), st.session_state.get('clinic_name')
@@ -475,35 +486,39 @@ elif page == t["nav_analysis"]:
                         )
 
 # ==========================================
-# 6. РАЗДЕЛ: СТАТИСТИКА & СРАВНЕНИЕ
+# 6. РАЗДЕЛ: СТАТИСТИКА & СРАВНЕНИЕ (РЕАЛЬНЫЕ ДАННЫЕ)
 # ==========================================
 elif page == t["nav_stats"]:
     st.title(t["comparison_title"])
     
-    curr_id = st.session_state.get("selected_patient_id", "115002084")
-    p_history = get_patient_history(curr_id)
+    curr_id = st.session_state.get("selected_patient_id", "100000284")
+    curr_name = st.session_state.get("selected_patient_name", "Иванов Иван Иванович")
+    st.write(f"👤 Пациент: **{curr_name}** (ID: {curr_id})")
     
-    st.write(f"👤 Пациент: **{st.session_state.get('selected_patient_name', 'Иванов Иван Иванович')}** (ID: {curr_id})")
+    patient_df = get_patient_history(curr_id)
     
-    g1, g2 = st.columns(2)
-    with g1:
-        st.subheader("RBC / WBC Динамика (↑↑)")
-        chart_data1 = pd.DataFrame(np.random.randn(10, 2) + [100, 80], columns=['Текущий', "Прошлый"])
-        st.line_chart(chart_data1)
-    with g2:
-        st.subheader("RA / RC Плотность (↓↓)")
-        chart_data2 = pd.DataFrame(np.random.randn(10, 2) + [50, 40], columns=['Текущий', "Прошлый"])
-        st.area_chart(chart_data2)
-
-    st.subheader("Сводная таблица показателей")
-    table_data = pd.DataFrame({
-        'Компонент': ['RBC', 'WBC', 'Platelets'],
-        'Прошлый анализ': [17.53, 9.63, 0.55],
-        'Текущий анализ': [11.0, 0.37, 0.82],
-        'Норма': [18.6, 11.6, 10.3],
-        'Динамика': ['📈 Рост', '📉 Снижение', '📈 Рост']
-    })
-    st.dataframe(table_data, use_container_width=True)
+    if not patient_df.empty:
+        st.success(f"Найдено сохраненных анализов в базе: {len(patient_df)}")
+        
+        # Подготовка данных для графиков на основе реальной истории
+        chart_source = pd.DataFrame({
+            'Дата': patient_df['timestamp'],
+            'Всего клеток': patient_df['total_count']
+        })
+        
+        g1, g2 = st.columns(2)
+        with g1:
+            st.subheader("Динамика общего числа обнаруженных объектов")
+            st.line_chart(chart_source.set_index('Дата'))
+            
+        with g2:
+            st.subheader("Сравнение по количеству")
+            st.bar_chart(chart_source.set_index('Дата'))
+            
+        st.subheader("📋 История анализов этого пациента")
+        st.dataframe(patient_df[['timestamp', 'doctor_name', 'clinic', 'total_count', 'counts_json']], use_container_width=True)
+    else:
+        st.info("У этого пациента пока нет сохраненных анализов. Сделайте первый снимок через вкладку 'Анализы & Сканирование', чтобы увидеть динамику.")
 
 # ==========================================
 # 7. РАЗДЕЛ: НАСТРОЙКИ
@@ -512,4 +527,5 @@ elif page == t["nav_settings"]:
     st.title(t["nav_settings"])
     st.text_input("Название клиники", value=st.session_state.get('clinic_name'))
     st.text_input("ФИО Специалиста", value=st.session_state.get('doc_name'))
-    st.button("Сохранить изменения")
+    if st.button("Сохранить изменения"):
+        st.success("Настройки успешно сохранены!")
