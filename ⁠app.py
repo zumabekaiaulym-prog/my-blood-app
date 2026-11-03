@@ -13,92 +13,105 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 import urllib.parse
 
-# Настройка страницы
-st.set_page_config(page_title="ScanHemo AI", layout="wide", initial_sidebar_state="expanded")
+# Page Configuration
+st.set_page_config(
+    page_title="ScanHemo Ai", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
 
 # ==========================================
-# КАСПЕРЫ И СТИЛИЗАЦИЯ ПОД МАКЕТ (ЖУРНАЛ / HIGH-TECH)
+# CUSTOM STYLING (CLEAN MEDICAL LIGHT THEME)
 # ==========================================
 st.markdown("""
 <style>
-    /* Основные цвета фона и текста в стиле темного кибер-журнала */
+    /* Main App Background & Typography */
     .stApp {
-        background-color: #0d0f12;
-        color: #f0f0f0;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Сайдбар */
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
-        background-color: #14171d;
-        border-right: 1px solid #262c36;
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
     }
     [data-testid="stSidebar"] * {
-        color: #e0e0e0 !important;
+        color: #334155 !important;
     }
 
-    /* Брендовый заголовок */
+    /* Brand Header */
     .brand-title {
-        color: #ffffff;
-        font-weight: 900;
-        font-size: 32px;
-        letter-spacing: -1px;
+        color: #0f172a;
+        font-weight: 800;
+        font-size: 28px;
+        letter-spacing: -0.5px;
     }
     .brand-title span {
-        color: #FF007F;
+        color: #0284c7;
     }
 
-    /* Карточки пациентов в стиле макета */
+    /* Patient Cards */
     .patient-card {
-        background-color: #171b22;
-        border-radius: 4px;
-        padding: 20px;
-        border: 1px solid #2a323d;
-        border-left: 4px solid #FF007F;
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid #0284c7;
         text-align: left;
         margin-bottom: 15px;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     
-    /* Журнальные акцентные заголовки */
+    /* Section Headers */
     .journal-header {
-        border-bottom: 2px solid #FF007F;
+        border-bottom: 2px solid #0284c7;
         padding-bottom: 8px;
         margin-bottom: 20px;
         text-transform: uppercase;
-        letter-spacing: 2px;
-        font-weight: 800;
-        color: #ffffff;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 20px;
     }
 
-    /* Кнопки */
+    /* Primary Action Buttons */
     .stButton>button {
-        background-color: #FF007F;
+        background-color: #0284c7;
         color: white;
-        border-radius: 2px;
+        border-radius: 6px;
         border: none;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        transition: all 0.3s ease;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        transition: background-color 0.2s ease;
     }
     .stButton>button:hover {
-        background-color: #d9006b;
+        background-color: #0369a1;
         color: white;
-        box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
     }
     
-    /* Текстовые поля и селекты */
+    /* Inputs */
     input, textarea, select {
-        background-color: #171b22 !important;
-        color: white !important;
-        border: 1px solid #2a323d !important;
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+    }
+    
+    /* Diagnostic Alert Boxes */
+    .diag-box {
+        background-color: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. БАЗА ДАННЫХ
+# DATABASE INITIALIZATION
 # ==========================================
 def init_db():
     conn = sqlite3.connect("scanhemo_history.db")
@@ -146,12 +159,6 @@ def save_analysis(doc_name, doc_role, clinic, p_id, p_name, p_dob, p_gender, tot
     conn.commit()
     conn.close()
 
-def get_history():
-    conn = sqlite3.connect("scanhemo_history.db")
-    df = pd.read_sql_query("SELECT * FROM history ORDER BY id DESC", conn)
-    conn.close()
-    return df
-
 def get_patient_history(p_id):
     if not p_id:
         return pd.DataFrame()
@@ -163,13 +170,12 @@ def get_patient_history(p_id):
 init_db()
 
 # ==========================================
-# 1. МУЛЬТИЯЗЫЧНОСТЬ
+# LOCALIZATION DICTIONARIES
 # ==========================================
 translations = {
     "Русский": {
         "title": "ScanHemo<span>Ai</span>",
-        "subtitle": "Квантовый скачок в гематологии",
-        "login_title": "АВТОРИЗАЦИЯ В СИСТЕМЕ",
+        "subtitle": "Интеллектуальная система анализа крови",
         "btn_login": "ВОЙТИ В СИСТЕМУ",
         "nav_patients": "👥 ПАЦИЕНТЫ",
         "nav_analysis": "🔬 АНАЛИЗ & СКАНЕР",
@@ -185,22 +191,20 @@ translations = {
         "selected_patient_title": "АКТИВНЫЙ ПРОФИЛЬ:",
         "btn_new_scan": "🔬 СДЕЛАТЬ АНАЛИЗ",
         "btn_view_history": "📜 ИСТОРИЯ И ДИНАМИКА",
-        "upload_label": "Загрузите файл или используйте камеру микроскопа",
+        "upload_label": "Загрузите файл мазка или используйте камеру микроскопа",
         "orig_img": "ИСХОДНЫЙ СНИМОК",
-        "ai_result": "АНАЛИЗ ИИ (ДЕТЕКЦИЯ КЛЕТОК)",
+        "ai_result": "РЕЗУЛЬТАТ ДЕТЕКЦИИ ИИ",
         "btn_analyze": "⚡ ЗАПУСТИТЬ ИИ-АНАЛИЗ",
-        "analyzing": "Квантовый сканер обрабатывает клетки крови...",
+        "analyzing": "Нейросеть производит подсчет и классификацию клеток...",
         "total_found": "ВСЕГО ОБНАРУЖЕНО ОБЪЕКТОВ: ",
         "download_pdf": "📄 СКАЧАТЬ PDF ОТЧЕТ",
         "send_whatsapp": "💬 ОТПРАВИТЬ В WHATSAPP",
-        "comparison_title": "📈 ДИНАМИКА И ИСТОРИЯ АНАЛИЗОВ",
-        "obs_normal": "Гематологические показатели в пределах референтной нормы.",
-        "rec_normal": "Контрольный осмотр через 12 месяцев."
+        "comparison_title": "📈 ДИНАМИКА АНАЛИЗОВ ПАЦИЕНТА",
+        "diag_header": "🩺 ЗАКЛЮЧЕНИЕ И РЕКОМЕНДАЦИИ ИИ"
     },
     "Қазақша": {
         "title": "ScanHemo<span>Ai</span>",
-        "subtitle": "Гематологиядағы кванттық серпіліс",
-        "login_title": "ЖҮЙЕГЕ КІРУ",
+        "subtitle": "Қан талдаудың зияткерлік жүйесі",
         "btn_login": "КІРУ",
         "nav_patients": "👥 ПАЦИЕНТТЕР",
         "nav_analysis": "🔬 ТАЛДАУ & СКАНЕР",
@@ -220,24 +224,22 @@ translations = {
         "orig_img": "БАСТАПҚЫ СУРЕТ",
         "ai_result": "ЖИ ТАЛДАУ НӘТИЖЕСІ",
         "btn_analyze": "⚡ ЖИ АНАЛИЗБЕН БАСТАУ",
-        "analyzing": "ЖИ қан жасушаларын өңдеуде...",
+        "analyzing": "ЖИ қан жасушаларын талдауда...",
         "total_found": "ТАБЫЛҒАН НЫСАНДАР: ",
         "download_pdf": "📄 PDF ЕСЕПТІ ЖҮКТЕУ",
         "send_whatsapp": "💬 WHATSAPP ЖІБЕРУ",
         "comparison_title": "📈 ТАЛДАУ ДИНАМИКАСЫ",
-        "obs_normal": "Норма шегінде.",
-        "rec_normal": "Жоспарлы бақылау."
+        "diag_header": "🩺 ЖИ ТҰЖЫРЫМЫ МЕН ҰСЫНЫСТАРЫ"
     },
     "English": {
         "title": "ScanHemo<span>Ai</span>",
-        "subtitle": "Quantum Leap in Hematology",
-        "login_title": "SYSTEM LOGIN",
+        "subtitle": "Intelligent Blood Analysis System",
         "btn_login": "LOG IN",
         "nav_patients": "👥 PATIENTS",
         "nav_analysis": "🔬 ANALYSIS & SCAN",
         "nav_stats": "📊 STATISTICS & TRENDS",
         "nav_settings": "⚙️ SETTINGS",
-        "nav_logout": "🚪 LOG OUT",
+        "nav_logout": "LOG OUT",
         "patient_list": "PATIENT REGISTRY",
         "add_patient": "➕ REGISTER NEW PATIENT",
         "p_id": "Patient ID / SSN",
@@ -247,21 +249,20 @@ translations = {
         "selected_patient_title": "ACTIVE PROFILE:",
         "btn_new_scan": "🔬 RUN NEW ANALYSIS",
         "btn_view_history": "📜 HISTORY & TRENDS",
-        "upload_label": "Upload image or use microscope camera",
+        "upload_label": "Upload smear image or use microscope camera",
         "orig_img": "ORIGINAL IMAGE",
         "ai_result": "AI ANNOTATED RESULT",
         "btn_analyze": "⚡ RUN AI ANALYSIS",
-        "analyzing": "AI quantum scanner is processing blood cells...",
+        "analyzing": "Neural network is processing blood elements...",
         "total_found": "TOTAL OBJECTS FOUND: ",
         "download_pdf": "📄 DOWNLOAD PDF REPORT",
         "send_whatsapp": "💬 SEND VIA WHATSAPP",
         "comparison_title": "📈 PATIENT ANALYSIS TRENDS",
-        "obs_normal": "Blood parameters within normal limits.",
-        "rec_normal": "Routine follow-up in 12 months."
+        "diag_header": "🩺 AI DIAGNOSTIC INSIGHTS & RECOMMENDATIONS"
     }
 }
 
-# Инициализация стейта
+# Session State Setup
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "selected_patient_id" not in st.session_state:
@@ -281,18 +282,18 @@ if st.session_state["nav_page"] not in nav_options:
     st.session_state["nav_page"] = nav_options[0]
 
 # ==========================================
-# 2. АВТОРИЗАЦИЯ
+# AUTHENTICATION SCREEN
 # ==========================================
 if not st.session_state["authenticated"]:
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown(f"<h1 style='text-align: center;' class='brand-title'>{t['title']}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; color: #FF007F; font-weight: 700; letter-spacing: 2px;'>{t['subtitle']}</p><br>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: #0284c7; font-weight: 600;'>{t['subtitle']}</p><br>", unsafe_allow_html=True)
         
         doc_name = st.text_input("Имя специалиста", value="Dr. Alex Smith")
-        doc_role = st.text_input("Должность / Роль", value="Ведущий гематолог")
-        clinic_name = st.text_input("Лаборатория / Клиника", value="ScanHemo Research Lab 2026")
+        doc_role = st.text_input("Должность / Роль", value="Врач-гематолог")
+        clinic_name = st.text_input("Клиника / Лаборатория", value="ScanHemo Research Lab")
         password = st.text_input("Пароль", type="password", value="******")
         
         if st.button(t["btn_login"], use_container_width=True):
@@ -304,11 +305,11 @@ if not st.session_state["authenticated"]:
     st.stop()
 
 # ==========================================
-# 3. САЙДБАР
+# SIDEBAR NAVIGATION
 # ==========================================
 with st.sidebar:
     st.markdown(f"<h2 class='brand-title'>{t['title']}</h2>", unsafe_allow_html=True)
-    st.caption(f"THE FUTURE: NOW 2026")
+    st.caption("Clinical AI Workstation")
     st.write(f"👤 **{st.session_state.get('doc_name', 'Специалист')}**")
     st.markdown("---")
     
@@ -325,7 +326,7 @@ with st.sidebar:
         st.session_state["authenticated"] = False
         st.rerun()
 
-# Генератор PDF отчетов
+# Helper for PDF clean formatting
 def clean_text(text):
     charmap = {
         'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z',
@@ -344,36 +345,81 @@ def generate_pdf(p_id, p_name, p_dob, counts, total, obs, recs, doc_name, clinic
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    c.setFillColor(colors.HexColor("#14171d"))
-    c.rect(0, height - 70, width, 70, fill=True, stroke=False)
+    # Header bar
+    c.setFillColor(colors.HexColor("#0284c7"))
+    c.rect(0, height - 60, width, 60, fill=True, stroke=False)
     
-    c.setFillColor(colors.HexColor("#FF007F"))
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(40, height - 42, "SCANHEMO AI — QUANTUM REPORT")
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, height - 38, "SCANHEMO AI — CLINICAL REPORT")
     
-    y = height - 100
+    y = height - 90
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(40, y, f"Patient: {clean_text(p_name)} (ID: {clean_text(p_id)})")
+    c.drawString(40, y, f"Patient ID: {clean_text(p_id)} | Name: {clean_text(p_name)}")
     c.drawString(40, y - 15, f"DOB: {clean_text(p_dob)} | Facility: {clean_text(clinic)}")
     
-    y -= 50
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y, "Detected Elements Count:")
-    y -= 20
+    y -= 45
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Cell Count Summary:")
+    y -= 18
     
     for k, v in counts.items():
         c.setFont("Helvetica", 10)
         c.drawString(55, y, f"- {clean_text(k)}: {v}")
-        y -= 15
+        y -= 14
+        
+    y -= 10
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "AI Diagnostic Conclusions:")
+    y -= 18
+    for o in obs:
+        c.setFont("Helvetica", 10)
+        c.drawString(55, y, f"- {clean_text(o)}")
+        y -= 14
         
     c.showPage()
     c.save()
     buffer.seek(0)
     return buffer.getvalue()
 
+# Smart clinical diagnostics generator based on cell counts
+def generate_clinical_insights(counts, lang):
+    total_cells = sum(counts.values()) if counts else 0
+    rbc = counts.get("RBC", counts.get("Red Blood Cell", 0))
+    wbc = counts.get("WBC", counts.get("White Blood Cell", 0))
+    platelets = counts.get("Platelets", counts.get("Platelet", 0))
+    
+    observations = []
+    recommendations = []
+    
+    if lang == "Русский":
+        if wbc > 15:
+            observations.append("Обнаружено повышение уровня лейкоцитов (возможен воспалительный процесс).")
+            recommendations.append("Рекомендовано проведение расширенной лейкоцитарной формулы и консультация терапевта.")
+        elif wbc < 3 and wbc > 0:
+            observations.append("Фиксируется умеренная лейкопения.")
+            recommendations.append("Рекомендован динамический контроль общего анализа крови через 14 дней.")
+        else:
+            observations.append("Соотношение основных клеточных популяций в пределах референтных границ.")
+            
+        if platelets < 100 and platelets > 0:
+            observations.append("Отмечается снижение концентрации тромбоцитов.")
+            recommendations.append("Консультация гематолога для исключения тромбоцитопении.")
+        else:
+            recommendations.append("Плановый контрольный осмотр через 6-12 месяцев.")
+            
+    elif lang == "Қазақша":
+        observations.append("Қан жасушаларының көрсеткіштері стандартты норма шегінде.")
+        recommendations.append("Жоспарлы профилактикалық тексеруден өту ұсынылады.")
+    else:
+        observations.append("Cell morphology and distribution are generally within normal limits.")
+        recommendations.append("Routine follow-up exam recommended in 6 months.")
+        
+    return observations, recommendations
+
 # ==========================================
-# 4. РАЗДЕЛ: ПАЦИЕНТЫ
+# PATIENTS SECTION
 # ==========================================
 if page == t["nav_patients"]:
     st.markdown(f"<h1 class='journal-header'>{t['patient_list']}</h1>", unsafe_allow_html=True)
@@ -400,10 +446,10 @@ if page == t["nav_patients"]:
         with col:
             st.markdown(f"""
             <div class='patient-card'>
-                <div style='font-size: 28px;'>🧬</div>
-                <h4 style='margin: 8px 0; color: #ffffff;'>{p['patient_name']}</h4>
-                <p style='margin: 0; color: #8a99ad; font-size: 11px;'>ID: {p['patient_id']}</p>
-                <p style='margin: 0; color: #8a99ad; font-size: 11px;'>ДР: {p['patient_dob']}</p>
+                <div style='font-size: 24px;'>👤</div>
+                <h4 style='margin: 8px 0; color: #0f172a; font-size: 16px;'>{p['patient_name']}</h4>
+                <p style='margin: 0; color: #64748b; font-size: 12px;'>ID: {p['patient_id']}</p>
+                <p style='margin: 0; color: #64748b; font-size: 12px;'>ДР: {p['patient_dob']}</p>
             </div>
             """, unsafe_allow_html=True)
             if st.button(t["select_patient"], key=f"btn_{p['patient_id']}", use_container_width=True):
@@ -414,7 +460,7 @@ if page == t["nav_patients"]:
 
     if st.session_state["selected_patient_id"]:
         st.markdown("---")
-        st.markdown(f"<h3 style='color: #FF007F;'>{t['selected_patient_title']} {st.session_state['selected_patient_name']} (ID: {st.session_state['selected_patient_id']})</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #0284c7; font-size: 18px;'>{t['selected_patient_title']} {st.session_state['selected_patient_name']} (ID: {st.session_state['selected_patient_id']})</h3>", unsafe_allow_html=True)
         
         act_col1, act_col2 = st.columns(2)
         with act_col1:
@@ -427,7 +473,7 @@ if page == t["nav_patients"]:
                 st.rerun()
 
 # ==========================================
-# 5. РАЗДЕЛ: АНАЛИЗ & СКАНИРОВАНИЕ (КАМЕРА МИКРОСКОПА)
+# ANALYSIS & SCANNER SECTION
 # ==========================================
 elif page == t["nav_analysis"]:
     st.markdown(f"<h1 class='journal-header'>{t['nav_analysis']}</h1>", unsafe_allow_html=True)
@@ -440,8 +486,8 @@ elif page == t["nav_analysis"]:
     with col_sel3:
         p_dob = st.text_input(t["p_dob"], value=st.session_state.get("selected_patient_dob", "27.03.1999"))
         
-    st.markdown("### 🔬 ВЫБОР ИСТОЧНИКА КРОВИ")
-    input_method = st.radio("Источник изображения", ["Загрузить файл изображения", "Снять с камеры микроскопа / Веб-камеры"], horizontal=True)
+    st.markdown("### 🔬 ВЫБОР ИСТОЧНИКА ИЗОБРАЖЕНИЯ")
+    input_method = st.radio("Источник", ["Загрузить файл изображения", "Снять с камеры микроскопа / Веб-камеры"], horizontal=True)
     
     image = None
     if input_method == "Загрузить файл изображения":
@@ -449,7 +495,7 @@ elif page == t["nav_analysis"]:
         if uploaded_file:
             image = Image.open(uploaded_file)
     else:
-        camera_file = st.camera_input("Прямой захват с цифрового окуляра микроскопа")
+        camera_file = st.camera_input("Захват с цифрового окуляра микроскопа")
         if camera_file:
             image = Image.open(camera_file)
             
@@ -479,15 +525,24 @@ elif page == t["nav_analysis"]:
                         cell_class = p.get("class", "Cell")
                         counts[cell_class] = counts.get(cell_class, 0) + 1
                         x, y, w, h = int(p["x"]), int(p["y"]), int(p["width"]), int(p["height"])
-                        cv2.rectangle(cv_img, (int(x-w/2), int(y-h/2)), (int(x+w/2), int(y+h/2)), (255, 0, 127), 2)
+                        cv2.rectangle(cv_img, (int(x-w/2), int(y-h/2)), (int(x+w/2), int(y+h/2)), (2, 132, 199), 2)
                     
                     result_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
                     st.image(result_img, caption=t["ai_result"], use_container_width=True)
                     st.success(f"{t['total_found']}{len(predictions)}")
                     st.dataframe(pd.DataFrame(list(counts.items()), columns=["Тип клетки", "Количество"]), use_container_width=True)
                     
-                    obs = [t["obs_normal"]]
-                    recs = [t["rec_normal"]]
+                    # Generate AI Diagnostics & Recommendations
+                    obs, recs = generate_clinical_insights(counts, selected_lang)
+                    
+                    st.markdown(f"<div class='diag-box'><strong>{t['diag_header']}</strong><br>", unsafe_allow_html=True)
+                    st.markdown("🔹 **Наблюдения:**")
+                    for o in obs:
+                        st.markdown(f"- {o}")
+                    st.markdown("🔸 **Рекомендации:**")
+                    for r in recs:
+                        st.markdown(f"- {r}")
+                    st.markdown("</div>", unsafe_allow_html=True)
                     
                     save_analysis(
                         st.session_state.get('doc_name'), st.session_state.get('doc_role'), 
@@ -510,15 +565,15 @@ elif page == t["nav_analysis"]:
                             use_container_width=True
                         )
                     with col_dl2:
-                        wa_text = f"🩸 *ScanHemo AI Quantum Report*\n👤 Patient: {p_name} (ID: {p_id})\n🔬 Total Cells: {len(predictions)}"
+                        wa_text = f"🩸 *ScanHemo AI Report*\n👤 Patient: {p_name} (ID: {p_id})\n🔬 Total Cells: {len(predictions)}"
                         whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
                         st.markdown(
-                            f'<a href="{whatsapp_url}" target="_blank"><button style="width:100%;background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:2px;font-weight:bold;cursor:pointer;text-transform:uppercase;">{t["send_whatsapp"]}</button></a>',
+                            f'<a href="{whatsapp_url}" target="_blank"><button style="width:100%;background-color:#16a34a;color:white;padding:10px 20px;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">{t["send_whatsapp"]}</button></a>',
                             unsafe_allow_html=True
                         )
 
 # ==========================================
-# 6. СТАТИСТИКА & СРАВНЕНИЕ (РЕАЛЬНАЯ ИСТОРИЯ)
+# STATISTICS & TRENDS SECTION
 # ==========================================
 elif page == t["nav_stats"]:
     st.markdown(f"<h1 class='journal-header'>{t['comparison_title']}</h1>", unsafe_allow_html=True)
@@ -544,12 +599,12 @@ elif page == t["nav_stats"]:
             st.bar_chart(chart_source.set_index('Дата'))
             
         st.subheader("📋 Архивы анализов пациента")
-        st.dataframe(patient_df[['timestamp', 'doctor_name', 'clinic', 'total_count', 'counts_json']], use_container_width=True)
+        st.dataframe(patient_df[['timestamp', 'doctor_name', 'clinic', 'total_count']], use_container_width=True)
     else:
-        st.info("У этого пациента еще нет сохраненных сеансов. Проведите первое сканирование через вкладку анализа.")
+        st.info("У этого пациента еще нет сохраненных сеансов. Проведите первое сканирование.")
 
 # ==========================================
-# 7. НАСТРОЙКИ
+# SETTINGS SECTION
 # ==========================================
 elif page == t["nav_settings"]:
     st.markdown(f"<h1 class='journal-header'>{t['nav_settings']}</h1>", unsafe_allow_html=True)
