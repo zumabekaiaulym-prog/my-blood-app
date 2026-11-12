@@ -12,6 +12,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 import urllib.parse
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 # Page Configuration
 st.set_page_config(
@@ -396,19 +397,16 @@ def generate_pdf(p_id, p_name, p_dob, counts, extended_metrics, total, obs, recs
     buffer.seek(0)
     return buffer.getvalue()
 
-# Smart clinical diagnostics generator including expanded CBC metrics (RBC, WBC, PLT, HGB, HTC, MCV, MCH)
 def generate_extended_clinical_insights(counts, lang):
-    # Estimating basic CBC metrics based on YOLO cell counts or defaults
     rbc_count = counts.get("RBC", counts.get("Red Blood Cell", 45))
     wbc_count = counts.get("WBC", counts.get("White Blood Cell", 6))
     plt_count = counts.get("Platelets", counts.get("Platelet", 250))
     
-    # Mathematical approximations for extended parameters (CBC)
-    hgb = round(rbc_count * 0.3, 1) + 115 if rbc_count < 100 else 135.0 # g/L
-    htc = round(hgb * 0.3, 1) # %
-    mcv = round(80 + (rbc_count % 10), 1) # fL (Mean Corpuscular Volume)[span_2](start_span)[span_2](end_span)
-    mch = round(27 + (hgb % 5), 1) # pg (Mean Corpuscular Hemoglobin)[span_3](start_span)[span_3](end_span)
-    plt = max(100, min(450, plt_count * 15)) # 10^9/L
+    hgb = round(rbc_count * 0.3, 1) + 115 if rbc_count < 100 else 135.0
+    htc = round(hgb * 0.3, 1)
+    mcv = round(80 + (rbc_count % 10), 1)
+    mch = round(27 + (hgb % 5), 1)
+    plt = max(100, min(450, plt_count * 15))
     
     extended_metrics = {
         "RBC (Red Blood Cells)": f"{rbc_count} cells/field",
@@ -427,47 +425,26 @@ def generate_extended_clinical_insights(counts, lang):
         if hgb < 120:
             observations.append(f"Внимание: Снижен уровень гемоглобина (HGB: {hgb} г/л). Возможен риск анемии.")
             recommendations.append("Рекомендовано проверить уровень ферритина и проконсультироваться с терапевтом.")
-            if mcv < 80:
-                recommendations.append("Низкий показатель MCV (<80 фл) указывает на микроцитарный характер изменений.")
         else:
             observations.append(f"Уровень гемоглобина (HGB: {hgb} г/л) и эритроцитарные индексы в норме.")
-            
         if plt < 150:
             observations.append(f"Обнаружена тромбоцитопения (PLT: {plt}).")
-            recommendations.append("Требуется дополнительный контроль свертываемости крови у гематолога.")
-        elif plt > 450:
-            observations.append(f"Повышенный уровень тромбоцитов (PLT: {plt}).")
-            recommendations.append("Рекомендовано исключить воспалительные процессы.")
         else:
             observations.append(f"Тромбоцитарный росток (PLT: {plt}) стабилен.")
-            
-        if wbc_count > 12:
-            observations.append("Зафиксирован лейкоцитоз (повышение WBC).")
-            recommendations.append("Возможна воспалительная или инфекционная реакция.")
-        else:
-            recommendations.append("Плановый контрольный осмотр через 6 месяцев.")
-            
+        recommendations.append("Плановый контрольный осмотр через 6 месяцев.")
     elif lang == "Қазақша":
         if hgb < 120:
-            observations.append(f"Назар аударыңыз: Гемоглобин деңгейі төмен (HGB: {hgb} г/л). Анемия қаупі бар.")
+            observations.append(f"Назар аударыңыз: Гемоглобин деңгейі төмен (HGB: {hgb} г/л).")
             recommendations.append("Темір мөлшерін тексеріп, дәрігерге қаралу ұсынылады.")
         else:
             observations.append("Гемоглобин мен эритроцитарлық индекстер қалыпты шекте.")
-        if plt < 150:
-            observations.append("Тромбоциттер деңгейі төмен (тромбоцитопения).")
-        else:
-            observations.append("Барлық негізгі көрсеткіштер қалыпты.")
         recommendations.append("Жоспарлы бақылау тексеруі.")
     else:
         if hgb < 120:
-            observations.append(f"Warning: Low hemoglobin detected (HGB: {hgb} g/L). Risk of anemia.")
+            observations.append(f"Warning: Low hemoglobin detected (HGB: {hgb} g/L).")
             recommendations.append("Consider iron panel evaluation.")
         else:
             observations.append("Hemoglobin and corpuscular indices are within normal limits.")
-        if plt < 150:
-            observations.append("Platelet count is below normal range.")
-        else:
-            observations.append("Platelet status is stable.")
         recommendations.append("Routine follow-up in 6 months.")
         
     return extended_metrics, observations, recommendations
@@ -548,9 +525,19 @@ elif page == t["nav_analysis"]:
         if uploaded_file:
             image = Image.open(uploaded_file)
     else:
-        camera_file = st.camera_input("Захват с цифрового окуляра микроскопа")
-        if camera_file:
-            image = Image.open(camera_file)
+        st.markdown("Захват с цифрового окуляра микроскопа (с выбором USB-устройства)")
+        
+        # Интеграция streamlit-webrtc для выбора внешней USB-камеры (включая iPad Safari)
+        webrtc_streamer(
+            key="microscope-scanner",
+            mode=WebRtcMode.SENDONLY,
+            media_stream_constraints={
+                "video": {"width": {"ideal": 1280}, "height": {"ideal": 720}},
+                "audio": False
+            },
+            async_processing=True
+        )
+        st.info("💡 Нажмите **Start** выше и выберите подключенный по USB микроскоп из выпадающего списка устройств.")
             
     if image is not None:
         c1, c2 = st.columns(2)
@@ -584,7 +571,6 @@ elif page == t["nav_analysis"]:
                     st.image(result_img, caption=t["ai_result"], use_container_width=True)
                     st.success(f"{t['total_found']}{len(predictions)}")
                     
-                    # Generate Expanded CBC metrics & AI Recommendations
                     extended_metrics, obs, recs = generate_extended_clinical_insights(counts, selected_lang)
                     
                     st.markdown("### 📋 РАСШИРЕННЫЙ АНАЛИЗ КРОВИ (CBC)")
@@ -594,7 +580,6 @@ elif page == t["nav_analysis"]:
                     st.markdown("### 🔬 Детекция элементов по классам:")
                     st.dataframe(pd.DataFrame(list(counts.items()), columns=["Тип клетки", "Количество"]), use_container_width=True)
                     
-                    # Display AI Diagnostics & Recommendations
                     st.markdown(f"<div class='diag-box'><strong>{t['diag_header']}</strong><br>", unsafe_allow_html=True)
                     st.markdown("🔹 **Клинические наблюдения:**")
                     for o in obs:
