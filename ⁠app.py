@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import sqlite3
 import json
+import threading
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -26,14 +27,11 @@ st.set_page_config(
 # ==========================================
 st.markdown("""
 <style>
-    /* Main App Background & Typography */
     .stApp {
         background-color: #f8fafc;
         color: #1e293b;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
-    
-    /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background-color: #ffffff;
         border-right: 1px solid #e2e8f0;
@@ -41,8 +39,6 @@ st.markdown("""
     [data-testid="stSidebar"] * {
         color: #334155 !important;
     }
-
-    /* Brand Header */
     .brand-title {
         color: #0f172a;
         font-weight: 800;
@@ -52,8 +48,6 @@ st.markdown("""
     .brand-title span {
         color: #0284c7;
     }
-
-    /* Patient Cards */
     .patient-card {
         background-color: #ffffff;
         border-radius: 8px;
@@ -64,8 +58,6 @@ st.markdown("""
         margin-bottom: 15px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
-    
-    /* Section Headers */
     .journal-header {
         border-bottom: 2px solid #0284c7;
         padding-bottom: 8px;
@@ -76,8 +68,6 @@ st.markdown("""
         color: #0f172a;
         font-size: 20px;
     }
-
-    /* Primary Action Buttons */
     .stButton>button {
         background-color: #0284c7;
         color: white;
@@ -91,16 +81,12 @@ st.markdown("""
         background-color: #0369a1;
         color: white;
     }
-    
-    /* Inputs */
     input, textarea, select {
         background-color: #ffffff !important;
         color: #0f172a !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 6px !important;
     }
-    
-    /* Diagnostic Alert Boxes */
     .diag-box {
         background-color: #eff6ff;
         border: 1px solid #bfdbfe;
@@ -274,6 +260,8 @@ if "selected_patient_dob" not in st.session_state:
     st.session_state["selected_patient_dob"] = "N/A"
 if "nav_page" not in st.session_state:
     st.session_state["nav_page"] = "👥 ПАЦИЕНТЫ"
+if "captured_microscope_img" not in st.session_state:
+    st.session_state["captured_microscope_img"] = None
 
 selected_lang = st.sidebar.selectbox("🌐 LANGUAGE / ТІЛ / ЯЗЫК", ["Русский", "Қазақша", "English"])
 t = translations[selected_lang]
@@ -346,7 +334,6 @@ def generate_pdf(p_id, p_name, p_dob, counts, extended_metrics, total, obs, recs
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
     
-    # Header bar
     c.setFillColor(colors.HexColor("#0284c7"))
     c.rect(0, height - 60, width, 60, fill=True, stroke=False)
     
@@ -527,17 +514,40 @@ elif page == t["nav_analysis"]:
     else:
         st.markdown("Захват с цифрового окуляра микроскопа (с выбором USB-устройства)")
         
-        # Интеграция streamlit-webrtc для выбора внешней USB-камеры (включая iPad Safari)
-        webrtc_streamer(
+        lock = threading.Lock()
+        img_container = {"img": None}
+
+        def video_frame_callback(frame):
+            img = frame.to_ndarray(format="bgr24")
+            with lock:
+                img_container["img"] = img
+            return frame
+
+        ctx = webrtc_streamer(
             key="microscope-scanner",
-            mode=WebRtcMode.SENDONLY,
+            mode=WebRtcMode.SENDRECV,
+            video_frame_callback=video_frame_callback,
             media_stream_constraints={
                 "video": {"width": {"ideal": 1280}, "height": {"ideal": 720}},
                 "audio": False
             },
             async_processing=True
         )
-        st.info("💡 Нажмите **Start** выше и выберите подключенный по USB микроскоп из выпадающего списка устройств.")
+        
+        st.info("💡 1. Нажмите **SELECT DEVICE**, выберите USB-камеру микроскопа и нажмите **START**.\n2. Когда наведете резкость, нажмите кнопку ниже для фиксации кадра.")
+        
+        if st.button("📸 СДЕЛАТЬ СНИМОК С МИКРОСКОПА", use_container_width=True):
+            with lock:
+                frame_bgr = img_container["img"]
+            if frame_bgr is not None:
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                st.session_state["captured_microscope_img"] = Image.fromarray(frame_rgb)
+                st.success("Кадр успешно захвачен с микроскопа!")
+            else:
+                st.warning("Сначала запустите камеру (кнопка START) и дождитесь появления видео.")
+                
+        if st.session_state["captured_microscope_img"] is not None:
+            image = st.session_state["captured_microscope_img"]
             
     if image is not None:
         c1, c2 = st.columns(2)
