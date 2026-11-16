@@ -1,4 +1,6 @@
 streamlit
+streamlit-webrtc
+av
 pillow
 pandas
 requests
